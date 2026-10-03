@@ -1,0 +1,6 @@
+- name: Install and configure MongoDB
+  hosts: mongodb
+  become: true
+  gather_facts: true
+  roles:
+    - mongodb
