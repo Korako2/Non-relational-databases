@@ -1,3 +1,6 @@
 ansible_host: "{{ lookup('ansible.builtin.env', 'SERVER_IP') }}"
 ansible_user: "{{ lookup('ansible.builtin.env', 'SERVER_USER') }}"
 ansible_ssh_private_key_file: "{{ lookup('ansible.builtin.env', 'SSH_KEY') | default('~/.ssh/id_ed25519', true) }}"
+mongodb_port: 27017
+mongodb_bind_ip: "127.0.0.1"
+mongodb_healthcheck_host: "127.0.0.1"
