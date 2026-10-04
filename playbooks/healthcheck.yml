@@ -17,6 +17,7 @@
       register: mongodb_ping
       changed_when: false
       failed_when: false
+      when: not mongodb_authorization_enabled
 
     - name: Determine MongoDB health
       ansible.builtin.set_fact:
