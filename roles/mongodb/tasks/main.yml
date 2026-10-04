@@ -1,16 +1,16 @@
 - name: Validate operating system
   ansible.builtin.assert:
     that:
-      - ansible_distribution == "Ubuntu"
-      - ansible_distribution_release in ["focal", "jammy", "noble"]
+      - ansible_facts["distribution"] == "Ubuntu"
+      - ansible_facts["distribution_release"] in ["focal", "jammy", "noble"]
     fail_msg: >-
       Unsupported operating system:
-      {{ ansible_distribution }}
-      {{ ansible_distribution_version }}
+      {{ ansible_facts["distribution"] }}
+      {{ ansible_facts["distribution_version"] }}
     success_msg: >-
       Supported operating system:
-      {{ ansible_distribution }}
-      {{ ansible_distribution_version }}
+      {{ ansible_facts["distribution"] }}
+      {{ ansible_facts["distribution_version"] }}
 
 - name: Install prerequisites
   ansible.builtin.apt:
@@ -30,7 +30,7 @@
     uris:
       - https://repo.mongodb.org/apt/ubuntu
     suites:
-      - "{{ ansible_distribution_release }}/mongodb-org/{{ mongodb_major_version }}"
+      - "{{ ansible_facts['distribution_release'] }}/mongodb-org/{{ mongodb_major_version }}"
     components:
       - multiverse
     architectures:
