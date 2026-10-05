@@ -86,9 +86,9 @@
         name: mongodb_rbac
         tasks_from: create_role
       vars:
-        rbac_role_name: "{{ rbac_role_item.name }}"
-        rbac_role_database: "{{ rbac_role_item.database }}"
-        rbac_role_privileges: "{{ rbac_role_item.privileges }}"
+        mongodb_rbac_role_name: "{{ rbac_role_item.name }}"
+        mongodb_rbac_role_database: "{{ rbac_role_item.database }}"
+        mongodb_rbac_role_privileges: "{{ rbac_role_item.privileges }}"
       loop: "{{ rbac_demo_roles }}"
       loop_control:
         loop_var: rbac_role_item
@@ -99,9 +99,9 @@
         name: mongodb_rbac
         tasks_from: create_user
       vars:
-        rbac_user_name: "{{ rbac_user_item.name }}"
-        rbac_user_password: "{{ rbac_user_item.password }}"
-        rbac_user_roles: "{{ rbac_user_item.roles }}"
+        mongodb_rbac_user_name: "{{ rbac_user_item.name }}"
+        mongodb_rbac_user_password: "{{ rbac_user_item.password }}"
+        mongodb_rbac_user_roles: "{{ rbac_user_item.roles }}"
       loop: "{{ rbac_demo_users }}"
       loop_control:
         loop_var: rbac_user_item
@@ -117,36 +117,36 @@
         name: mongodb_rbac
         tasks_from: check_read_access
       vars:
-        rbac_check_user: students_user
-        rbac_check_password: "{{ vault_students_password }}"
+        mongodb_rbac_check_user: students_user
+        mongodb_rbac_check_password: "{{ vault_students_password }}"
 
-        rbac_check_database: "{{ mongodb_university_db }}"
-        rbac_check_collection: students
+        mongodb_rbac_check_database: "{{ mongodb_university_db }}"
+        mongodb_rbac_check_collection: students
 
-        rbac_expect_access: true
+        mongodb_rbac_expect_access: true
 
     - name: Check that students_user cannot read teachers
       ansible.builtin.include_role:
         name: mongodb_rbac
         tasks_from: check_read_access
       vars:
-        rbac_check_user: students_user
-        rbac_check_password: "{{ vault_students_password }}"
+        mongodb_rbac_check_user: students_user
+        mongodb_rbac_check_password: "{{ vault_students_password }}"
 
-        rbac_check_database: "{{ mongodb_university_db }}"
-        rbac_check_collection: teachers
+        mongodb_rbac_check_database: "{{ mongodb_university_db }}"
+        mongodb_rbac_check_collection: teachers
 
-        rbac_expect_access: false
+        mongodb_rbac_expect_access: false
 
     - name: Grant reportsReader to reader_user
       ansible.builtin.include_role:
         name: mongodb_rbac
         tasks_from: set_user_roles
       vars:
-        rbac_user_name: reader_user
-        rbac_user_password: "{{ vault_reader_password }}"
+        mongodb_rbac_user_name: reader_user
+        mongodb_rbac_user_password: "{{ vault_reader_password }}"
 
-        rbac_user_roles:
+        mongodb_rbac_user_roles:
           - db: "{{ mongodb_university_db }}"
             role: educationReader
 
@@ -158,23 +158,23 @@
         name: mongodb_rbac
         tasks_from: check_read_access
       vars:
-        rbac_check_user: reader_user
-        rbac_check_password: "{{ vault_reader_password }}"
+        mongodb_rbac_check_user: reader_user
+        mongodb_rbac_check_password: "{{ vault_reader_password }}"
 
-        rbac_check_database: "{{ mongodb_reports_db }}"
-        rbac_check_collection: monthly_reports
+        mongodb_rbac_check_database: "{{ mongodb_reports_db }}"
+        mongodb_rbac_check_collection: monthly_reports
 
-        rbac_expect_access: true
+        mongodb_rbac_expect_access: true
 
     - name: Extend educationEditor permissions
       ansible.builtin.include_role:
         name: mongodb_rbac
         tasks_from: modify_role
       vars:
-        rbac_role_name: educationEditor
-        rbac_role_database: "{{ mongodb_university_db }}"
+        mongodb_rbac_role_name: educationEditor
+        mongodb_rbac_role_database: "{{ mongodb_university_db }}"
 
-        rbac_role_privileges:
+        mongodb_rbac_role_privileges:
           - resource:
               db: "{{ mongodb_university_db }}"
               collection: ""
@@ -189,10 +189,10 @@
         name: mongodb_rbac
         tasks_from: set_user_roles
       vars:
-        rbac_user_name: reader_user
-        rbac_user_password: "{{ vault_reader_password }}"
+        mongodb_rbac_user_name: reader_user
+        mongodb_rbac_user_password: "{{ vault_reader_password }}"
 
-        rbac_user_roles:
+        mongodb_rbac_user_roles:
           - db: "{{ mongodb_university_db }}"
             role: educationReader
 
@@ -201,26 +201,26 @@
         name: mongodb_rbac
         tasks_from: check_read_access
       vars:
-        rbac_check_user: reader_user
-        rbac_check_password: "{{ vault_reader_password }}"
+        mongodb_rbac_check_user: reader_user
+        mongodb_rbac_check_password: "{{ vault_reader_password }}"
 
-        rbac_check_database: "{{ mongodb_reports_db }}"
-        rbac_check_collection: monthly_reports
+        mongodb_rbac_check_database: "{{ mongodb_reports_db }}"
+        mongodb_rbac_check_collection: monthly_reports
 
-        rbac_expect_access: false
+        mongodb_rbac_expect_access: false
 
     - name: Delete editor_user
       ansible.builtin.include_role:
         name: mongodb_rbac
         tasks_from: delete_user
       vars:
-        rbac_user_name: editor_user
-        rbac_user_database: admin
+        mongodb_rbac_user_name: editor_user
+        mongodb_rbac_user_database: admin
 
     - name: Delete educationEditor role
       ansible.builtin.include_role:
         name: mongodb_rbac
         tasks_from: delete_role
       vars:
-        rbac_role_name: educationEditor
-        rbac_role_database: "{{ mongodb_university_db }}"
+        mongodb_rbac_role_name: educationEditor
+        mongodb_rbac_role_database: "{{ mongodb_university_db }}"
