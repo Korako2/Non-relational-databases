@@ -20,12 +20,12 @@
       - "{{ mongodb_ansible_python }}"
       - -c
       - "import pymongo; print(pymongo.version)"
-  register: pymongo_version
+  register: mongodb_rbac_pymongo_version
   changed_when: false
 
 - name: Show PyMongo version
   ansible.builtin.debug:
-    msg: "PyMongo version: {{ pymongo_version.stdout }}"
+    msg: "PyMongo version: {{ mongodb_rbac_pymongo_version.stdout }}"
 
 - name: Bootstrap MongoDB administrator using localhost exception
   community.mongodb.mongodb_user:

@@ -1,7 +1,7 @@
-- name: "Delete MongoDB user {{ rbac_user_name }}"
+- name: "Delete MongoDB user {{ mongodb_rbac_user_name }}"
   community.mongodb.mongodb_user:
-    database: "{{ rbac_user_database | default('admin') }}"
-    name: "{{ rbac_user_name }}"
+    database: "{{ mongodb_rbac_user_database | default('admin') }}"
+    name: "{{ mongodb_rbac_user_name }}"
     login_host: "127.0.0.1"
     login_port: "{{ mongodb_port }}"
     login_database: admin
