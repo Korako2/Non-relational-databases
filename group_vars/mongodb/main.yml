@@ -13,3 +13,15 @@ mongodb_reports_db: "reports"
 
 mongodb_ansible_venv: "/opt/ansible-mongodb"
 mongodb_ansible_python: "/opt/ansible-mongodb/bin/python"
+
+mongodb_backup_user: "backup_user"
+mongodb_lab_databases:
+  - "{{ mongodb_university_db }}"
+  - "{{ mongodb_reports_db }}"
+  -
+mongodb_backup_root: "/var/backups/mongodb"
+mongodb_backup_single_dir: "{{ mongodb_backup_root }}/single"
+mongodb_backup_all_dir: "{{ mongodb_backup_root }}/all"
+mongodb_backup_restore_dir: "{{ mongodb_backup_root }}/restore-demo"
+
+mongodb_tools_config: "/etc/mongodb-backup-tools.yml"
