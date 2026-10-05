@@ -12,3 +12,8 @@ net:
 
 processManagement:
     timeZoneInfo: /usr/share/zoneinfo
+
+{% if mongodb_authorization_enabled %}
+security:
+  authorization: enabled
+{% endif %}

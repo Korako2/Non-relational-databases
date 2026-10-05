@@ -4,3 +4,12 @@ ansible_ssh_private_key_file: "{{ lookup('ansible.builtin.env', 'SSH_KEY') | def
 mongodb_port: 27017
 mongodb_bind_ip: "127.0.0.1"
 mongodb_healthcheck_host: "127.0.0.1"
+
+mongodb_authorization_enabled: true
+mongodb_admin_user: "lab_admin"
+
+mongodb_university_db: "education"
+mongodb_reports_db: "reports"
+
+mongodb_ansible_venv: "/opt/ansible-mongodb"
+mongodb_ansible_python: "/opt/ansible-mongodb/bin/python"
