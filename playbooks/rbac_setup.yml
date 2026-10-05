@@ -1,0 +1,9 @@
+- name: Configure MongoDB RBAC infrastructure
+  hosts: mongodb
+
+  become: true
+  gather_facts: true
+
+  roles:
+    - mongodb
+    - mongodb_rbac
