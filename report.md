@@ -74,3 +74,158 @@ ansible-playbook playbooks/healthcheck.yml
 
 ![Health-check остановленной MongoDB](images/04-healthcheck-failed.png)
 
+## Часть 2. Управление ролевой моделью
+
+Во второй части лабораторной работы требовалось настроить пользователей и собственные роли MongoDB, реализовать назначение и отзыв ролей, изменение набора разрешений, доступ только к отдельной коллекции, а также удаление пользователя и роли.
+
+Для работы использовались две учебные базы:
+
+```yaml
+mongodb_university_db: "education"
+mongodb_reports_db: "reports"
+```
+
+Также была включена авторизация MongoDB:
+
+```yaml
+security:
+  authorization: enabled
+```
+
+Пароли пользователей не хранились в открытом виде в playbook. Для них использовался Ansible Vault:
+
+```bash
+ansible-vault edit group_vars/mongodb/vault.yml
+```
+
+Например, в зашифрованном файле хранятся пароли администратора и учебных пользователей.
+
+Для работы модулей `community.mongodb` потребовался PyMongo версии 4+. Так как системный пакет Ubuntu 22.04 содержал более старую версию PyMongo, для Ansible было создано отдельное Python-окружение:
+
+```yaml
+mongodb_ansible_venv: "/opt/ansible-mongodb"
+mongodb_ansible_python: "/opt/ansible-mongodb/bin/python"
+```
+
+Подготовка RBAC выполнялась отдельным playbook:
+
+```bash
+ansible-playbook playbooks/rbac_setup.yml --ask-vault-pass
+```
+
+Он устанавливает необходимые Python-зависимости, включает работу с PyMongo 4 и создает административного пользователя `lab_admin`.
+
+![Подготовка MongoDB RBAC и PyMongo](images/05-rbac-setup.png)
+
+После этого для демонстрации всех операций второй части использовался отдельный playbook:
+
+```bash
+ansible-playbook playbooks/rbac_demo.yml --ask-vault-pass
+```
+
+В начале сценария создавались четыре собственные роли:
+
+```text
+educationReader
+educationEditor
+reportsReader
+studentsReader
+```
+
+`educationReader` позволяет читать все коллекции базы `education`, а первоначальная версия `educationEditor` разрешает чтение и добавление документов. Роль `reportsReader` предназначена для чтения базы `reports`.
+
+Отдельная роль `studentsReader` была создана для демонстрации ограничения доступа только одной коллекцией:
+
+```yaml
+privileges:
+  - resource:
+      db: "{{ mongodb_university_db }}"
+      collection: "students"
+    actions:
+      - find
+```
+
+Таким образом, пользователь с этой ролью может читать `education.students`, но не получает права на остальные коллекции базы `education`.
+
+Также были созданы пользователи:
+
+```text
+reader_user   → educationReader
+editor_user   → educationEditor
+students_user → studentsReader
+```
+
+![Создание собственных ролей и пользователей](images/06-rbac-create_1.png)
+![Создание собственных ролей и пользователей](images/06-rbac-create_2.png)
+
+Для проверки ограничения по коллекции были подготовлены тестовые данные в коллекциях:
+
+```text
+education.students
+education.teachers
+education.courses
+```
+
+После этого playbook проверил доступ пользователя `students_user`.
+
+Ожидаемый результат:
+
+```text
+students_user CAN read education.students
+students_user CANNOT read education.teachers
+```
+
+![Проверка доступа только к коллекции students](images/07-collection-access.png)
+
+Далее была продемонстрирована выдача дополнительной роли. Пользователю `reader_user`, который изначально имел только `educationReader`, была дополнительно назначена роль `reportsReader`.
+
+После назначения доступ к `reports.monthly_reports` успешно прошел проверку.
+
+```text
+reader_user
+├── educationReader
+└── reportsReader
+```
+
+![Назначение дополнительной роли](images/08-role-grant.png)
+
+После этого набор разрешений роли `educationEditor` был изменен.
+
+Изначально роль разрешала:
+
+```text
+find
+insert
+```
+
+После изменения:
+
+```text
+find
+insert
+update
+remove
+```
+
+Таким образом был выполнен пункт задания по изменению набора разрешенных операций уже существующей роли.
+
+Далее роль `reportsReader` была отозвана у `reader_user`. После этого повторная проверка доступа к `reports.monthly_reports` завершилась ожидаемым отказом:
+
+```text
+reader_user CANNOT read reports.monthly_reports
+```
+
+![Изменение роли и отзыв reportsReader](images/09-role-modify-revoke.png)
+
+В конце демонстрационного сценария пользователь `editor_user` и роль `educationEditor` были удалены:
+
+```text
+Delete editor_user
+Delete educationEditor
+```
+
+Playbook успешно завершил весь сценарий создания, изменения и удаления элементов ролевой модели.
+
+![Удаление пользователя и роли и итоговый PLAY RECAP](images/10-rbac-delete-result.png)
+
+Таким образом, во второй части лабораторной работы были реализованы все требуемые операции с ролевой моделью MongoDB. При этом отдельные операции были вынесены в параметризованные Ansible task-файлы, поэтому одна и та же логика может использоваться для разных пользователей и ролей без копирования одинакового YAML-кода.
