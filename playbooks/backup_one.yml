@@ -1,0 +1,12 @@
+- name: Backup one MongoDB database
+  hosts: mongodb
+  become: true
+  gather_facts: false
+  vars:
+    backup_database: "{{ mongodb_university_db }}"
+    mongodb_backup_dir: "{{ mongodb_backup_single_dir }}"
+  tasks:
+    - name: Run MongoDB single database backup
+      ansible.builtin.include_role:
+        name: mongodb_backup
+        tasks_from: backup_one.yml
