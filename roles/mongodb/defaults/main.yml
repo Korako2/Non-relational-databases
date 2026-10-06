@@ -1,0 +1,4 @@
+mongodb_major_version: "8.0"
+mongodb_db_path: "/var/lib/mongodb"
+mongodb_log_path: "/var/log/mongodb/mongod.log"
+mongodb_authorization_enabled: false

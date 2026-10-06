@@ -1,0 +1,25 @@
+- name: Manage MongoDB service
+  hosts: mongodb
+  become: true
+  gather_facts: false
+
+  vars:
+    mongodb_service_state: started
+
+  pre_tasks:
+    - name: Validate requested MongoDB service state
+      ansible.builtin.assert:
+        that:
+          - mongodb_service_state in ['started', 'stopped', 'restarted']
+        fail_msg: >-
+          "Invalid MongoDB service state '{{ mongodb_service_state }}'. Must be one of: started, stopped, restarted."
+
+  tasks:
+    - name: Set MongoDB service state
+      ansible.builtin.systemd:
+        name: mongod
+        state: "{{ mongodb_service_state }}"
+        enabled: true
+    - name: Print selected action
+      ansible.builtin.debug:
+        msg: "MongoDB service state set to '{{ mongodb_service_state }}'."

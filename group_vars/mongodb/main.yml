@@ -1,0 +1,27 @@
+ansible_host: "{{ lookup('ansible.builtin.env', 'SERVER_IP') }}"
+ansible_user: "{{ lookup('ansible.builtin.env', 'SERVER_USER') }}"
+ansible_ssh_private_key_file: "{{ lookup('ansible.builtin.env', 'SSH_KEY') | default('~/.ssh/id_ed25519', true) }}"
+mongodb_port: 27017
+mongodb_bind_ip: "127.0.0.1"
+mongodb_healthcheck_host: "127.0.0.1"
+
+mongodb_authorization_enabled: true
+mongodb_admin_user: "lab_admin"
+
+mongodb_university_db: "education"
+mongodb_reports_db: "reports"
+
+mongodb_ansible_venv: "/opt/ansible-mongodb"
+mongodb_ansible_python: "/opt/ansible-mongodb/bin/python"
+
+mongodb_backup_user: "backup_user"
+mongodb_lab_databases:
+  - "{{ mongodb_university_db }}"
+  - "{{ mongodb_reports_db }}"
+
+mongodb_backup_root: "/var/backups/mongodb"
+mongodb_backup_single_dir: "{{ mongodb_backup_root }}/single"
+mongodb_backup_all_dir: "{{ mongodb_backup_root }}/all"
+mongodb_backup_restore_dir: "{{ mongodb_backup_root }}/restore-demo"
+
+mongodb_tools_config: "/etc/mongodb-backup-tools.yml"

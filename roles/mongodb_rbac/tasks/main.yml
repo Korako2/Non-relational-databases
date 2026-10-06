@@ -1,0 +1,45 @@
+---
+- name: Install Python virtualenv dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-venv
+      - python3-pip
+    state: present
+    update_cache: true
+
+- name: Install PyMongo 4 in isolated virtual environment
+  ansible.builtin.pip:
+    name: "pymongo>=4,<5"
+    virtualenv: "{{ mongodb_ansible_venv }}"
+    virtualenv_command: "/usr/bin/python3 -m venv"
+    state: present
+
+- name: Check PyMongo version
+  ansible.builtin.command:
+    argv:
+      - "{{ mongodb_ansible_python }}"
+      - -c
+      - "import pymongo; print(pymongo.version)"
+  register: mongodb_rbac_pymongo_version
+  changed_when: false
+
+- name: Show PyMongo version
+  ansible.builtin.debug:
+    msg: "PyMongo version: {{ mongodb_rbac_pymongo_version.stdout }}"
+
+- name: Bootstrap MongoDB administrator using localhost exception
+  community.mongodb.mongodb_user:
+    database: admin
+    name: "{{ mongodb_admin_user }}"
+    password: "{{ vault_mongodb_admin_password }}"
+    roles:
+      - db: admin
+        role: root
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    create_for_localhost_exception: "/var/lib/mongodb/.ansible-admin-created"
+    update_password: always
+    state: present
+  vars:
+    ansible_python_interpreter: "{{ mongodb_ansible_python }}"
+  no_log: true

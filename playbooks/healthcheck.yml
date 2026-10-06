@@ -1,0 +1,40 @@
+- name: Check MongoDB availability
+  hosts: mongodb
+  gather_facts: false
+
+  tasks:
+    - name: Execute MongoDB ping command
+      ansible.builtin.command:
+        argv:
+          - mongosh
+          - --host
+          - "{{ mongodb_healthcheck_host }}"
+          - --port
+          - "{{ mongodb_port | string }}"
+          - --eval
+          - "db.adminCommand({ ping: 1 }).ok"
+          - --quiet
+      register: mongodb_ping
+      changed_when: false
+      failed_when: false
+      when: not mongodb_authorization_enabled
+
+    - name: Determine MongoDB health
+      ansible.builtin.set_fact:
+        mongodb_healthy: >-
+          {{
+            mongodb_ping.rc == 0
+            and mongodb_ping.stdout | trim == "1"
+          }}
+    - name: Report MongoDB health
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            'MongoDB is AVAILABLE'
+            if mongodb_healthy
+            else 'MongoDB is UNAVAILABLE'
+          }}
+    - name: Fail if MongoDB is unavailable
+      ansible.builtin.fail:
+        msg: "MongoDB health check failed."
+      when: not mongodb_healthy

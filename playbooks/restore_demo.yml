@@ -1,0 +1,92 @@
+---
+- name: Demonstrate MongoDB collection restore
+  hosts: mongodb
+  become: true
+  gather_facts: false
+
+  vars:
+    restore_database: "{{ mongodb_university_db }}"
+    restore_collection: "students"
+    mongodb_backup_dir: "{{ mongodb_backup_restore_dir }}"
+
+  roles:
+    - mongodb_backup
+
+  tasks:
+    - name: Ensure restore demo document exists
+      community.mongodb.mongodb_shell:
+        login_host: "127.0.0.1"
+        login_port: "{{ mongodb_port }}"
+        login_database: admin
+        login_user: "{{ mongodb_admin_user }}"
+        login_password: "{{ vault_mongodb_admin_password }}"
+        db: "{{ restore_database }}"
+        eval: |
+          db.getCollection("{{ restore_collection }}").updateOne(
+            { _id: "restore-demo" },
+            {
+              $set: {
+                name: "Restore Demo Student",
+                course: 4
+              }
+            },
+            { upsert: true }
+          )
+      no_log: true
+
+    - name: Backup database before destructive test
+      ansible.builtin.include_role:
+        name: mongodb_backup
+        tasks_from: backup_one.yml
+      vars:
+        mongodb_backup_database: "{{ restore_database }}"
+        mongodb_backup_dir: "{{ mongodb_backup_restore_dir }}"
+
+    - name: Save created archive path
+      ansible.builtin.set_fact:
+        restore_archive: "{{ mongodb_backup_file }}"
+
+    - name: Delete collection before restore
+      ansible.builtin.include_role:
+        name: mongodb_backup
+        tasks_from: drop_collection.yml
+      vars:
+        mongodb_backup_drop_database_name: "{{ restore_database }}"
+        mongodb_backup_drop_collection_name: "{{ restore_collection }}"
+
+    - name: Restore deleted collection
+      ansible.builtin.include_role:
+        name: mongodb_backup
+        tasks_from: restore_collection.yml
+
+    - name: Verify collection was restored
+      community.mongodb.mongodb_shell:
+        login_host: "127.0.0.1"
+        login_port: "{{ mongodb_port }}"
+        login_database: admin
+        login_user: "{{ mongodb_admin_user }}"
+        login_password: "{{ vault_mongodb_admin_password }}"
+        db: "{{ restore_database }}"
+        stringify: false
+        eval: |
+          if (!db.getCollectionNames().includes("{{ restore_collection }}")) {
+            throw new Error(
+              "Collection {{ restore_collection }} was not restored"
+            );
+          }
+
+          if (
+            db.getCollection("{{ restore_collection }}")
+              .findOne({ _id: "restore-demo" }) === null
+          ) {
+            throw new Error(
+              "Restore demo document was not restored"
+            );
+          }
+      no_log: true
+
+    - name: Report successful restore
+      ansible.builtin.debug:
+        msg: >-
+          Collection {{ restore_database }}.{{ restore_collection }}
+          was successfully restored from {{ restore_archive }}.
