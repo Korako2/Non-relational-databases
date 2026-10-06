@@ -1,7 +1,7 @@
-- name: "Delete MongoDB role {{ rbac_role_name }}"
+- name: "Delete MongoDB role {{ mongodb_rbac_role_name }}"
   community.mongodb.mongodb_role:
-    name: "{{ rbac_role_name }}"
-    database: "{{ rbac_role_database }}"
+    name: "{{ mongodb_rbac_role_name }}"
+    database: "{{ mongodb_rbac_role_database }}"
     login_host: "127.0.0.1"
     login_port: "{{ mongodb_port }}"
     login_database: admin

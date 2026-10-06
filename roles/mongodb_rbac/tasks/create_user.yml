@@ -1,9 +1,9 @@
-- name: "Create MongoDB user {{ rbac_user_name }}"
+- name: "Create MongoDB user {{ mongodb_rbac_user_name }}"
   community.mongodb.mongodb_user:
-    database: "{{ rbac_user_database | default('admin') }}"
-    name: "{{ rbac_user_name }}"
-    password: "{{ rbac_user_password }}"
-    roles: "{{ rbac_user_roles }}"
+    database: "{{ mongodb_rbac_user_database | default('admin') }}"
+    name: "{{ mongodb_rbac_user_name }}"
+    password: "{{ mongodb_rbac_user_password }}"
+    roles: "{{ mongodb_rbac_user_roles }}"
     login_host: "127.0.0.1"
     login_port: "{{ mongodb_port }}"
     login_database: admin

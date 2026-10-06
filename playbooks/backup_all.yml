@@ -1,0 +1,13 @@
+- name: Backup all MongoDB databases
+  hosts: mongodb
+  become: true
+  gather_facts: false
+
+  vars:
+    mongodb_backup_dir: "{{ mongodb_backup_all_dir }}"
+
+  tasks:
+    - name: Run backup for all databases
+      ansible.builtin.include_role:
+        name: mongodb_backup
+        tasks_from: backup_all.yml

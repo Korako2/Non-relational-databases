@@ -1,17 +1,15 @@
-- name: >-
-    Check read access for {{ rbac_check_user }}
-    to {{ rbac_check_database }}.{{ rbac_check_collection }}
+- name: Check MongoDB read access
   community.mongodb.mongodb_shell:
     login_host: "127.0.0.1"
     login_port: "{{ mongodb_port }}"
     login_database: admin
-    login_user: "{{ rbac_check_user }}"
-    login_password: "{{ rbac_check_password }}"
-    db: "{{ rbac_check_database }}"
+    login_user: "{{ mongodb_rbac_check_user }}"
+    login_password: "{{ mongodb_rbac_check_password }}"
+    db: "{{ mongodb_rbac_check_database }}"
     eval: >-
-      db.getCollection({{ rbac_check_collection | to_json }}).findOne()
+      db.getCollection({{ mongodb_rbac_check_collection | to_json }}).findOne()
     debug: true
-  register: rbac_access_result
+  register: mongodb_rbac_access_result
 
   failed_when: false
   changed_when: false
@@ -22,24 +20,24 @@
     that:
       - >
         (
-          rbac_access_result.rc == 0
-          and (rbac_expect_access | bool)
+          mongodb_rbac_access_result.rc == 0
+          and (mongodb_rbac_expect_access | bool)
         )
         or
         (
-          rbac_access_result.rc != 0
-          and not (rbac_expect_access | bool)
+          mongodb_rbac_access_result.rc != 0
+          and not (mongodb_rbac_expect_access | bool)
         )
 
     success_msg: >-
       Access check passed:
-      {{ rbac_check_user }}
-      {{ 'CAN' if rbac_expect_access else 'CANNOT' }}
+      {{ mongodb_rbac_check_user }}
+      {{ 'CAN' if mongodb_rbac_expect_access else 'CANNOT' }}
       read
-      {{ rbac_check_database }}.{{ rbac_check_collection }}
+      {{ mongodb_rbac_check_database }}.{{ mongodb_rbac_check_collection }}
 
     fail_msg: >-
       Unexpected access result for
-      {{ rbac_check_user }}
+      {{ mongodb_rbac_check_user }}
       on
-      {{ rbac_check_database }}.{{ rbac_check_collection }}
+      {{ mongodb_rbac_check_database }}.{{ mongodb_rbac_check_collection }}
