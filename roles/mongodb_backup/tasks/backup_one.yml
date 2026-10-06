@@ -1,0 +1,60 @@
+- name: Validate backup database variable
+  ansible.builtin.assert:
+    that:
+      - mongodb_backup_database in mongodb_lab_databases
+    fail_msg: >-
+      The {{ mongodb_backup_database }} variable must be in the mongodb_lab_databases list.
+      Please check your configuration.
+
+- name: Generate backup timestamp
+  ansible.builtin.command:
+    argv:
+      - date
+      - -u
+      - "+%d%m%Y_%H%M%S"
+  register: mongodb_backup_timestamp_command
+  changed_when: false
+
+- name: Set backup filename
+  ansible.builtin.set_fact:
+    mongodb_backup_file: >-
+      {{ mongodb_backup_dir }}/{{ mongodb_backup_database }}_{{ mongodb_backup_timestamp_command.stdout }}.archive.gz
+
+- name: Backup database
+  ansible.builtin.command:
+    argv:
+      - mongodump
+      - --host
+      - "127.0.0.1"
+      - --port
+      - "{{ mongodb_port | string }}"
+      - --username
+      - "{{ mongodb_backup_user }}"
+      - --authenticationDatabase
+      - admin
+      - --config
+      - "{{ mongodb_tools_config }}"
+      - --db
+      - "{{ mongodb_backup_database }}"
+      - "--archive={{ mongodb_backup_file }}"
+      - --gzip
+  changed_when: true
+
+- name: Check created backup
+  ansible.builtin.stat:
+    path: "{{ mongodb_backup_file }}"
+  register: mongodb_backup_stat
+
+- name: Verify backup
+  ansible.builtin.assert:
+    that:
+      - mongodb_backup_stat.stat.exists
+      - mongodb_backup_stat.stat.size > 0
+    success_msg: >-
+      Backup successfully created:
+      {{ mongodb_backup_file }}
+      ({{ mongodb_backup_stat.stat.size }} bytes)
+
+- name: Show backup path
+  ansible.builtin.debug:
+    msg: "Created backup: {{ mongodb_backup_file }}"

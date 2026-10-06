@@ -1,0 +1,63 @@
+- name: Check MongoDB Ansible Python environment
+  ansible.builtin.stat:
+    path: "{{ mongodb_ansible_python }}"
+  register: mongodb_backup_ansible_python_stat
+
+- name: Verify MongoDB Ansible Python environment exists
+  ansible.builtin.assert:
+    that:
+      - mongodb_backup_ansible_python_stat.stat.exists
+    fail_msg: >-
+      MongoDB Ansible Python environment does not exist at {{ mongodb_ansible_python }}.
+      Run playbooks/rbac.yml to set up the required Python environment before running this playbook.
+
+- name: Install MongoDB database tools
+  ansible.builtin.apt:
+    name: mongodb-database-tools
+    state: present
+    update_cache: true
+
+- name: Create MongoDB backup user
+  ansible.builtin.include_role:
+    name: mongodb_rbac
+    tasks_from: create_user.yml
+  vars:
+    mongodb_rbac_user_name: "{{ mongodb_backup_user }}"
+    mongodb_rbac_user_password: "{{ vault_mongodb_backup_password }}"
+    mongodb_rbac_user_roles:
+      - db: admin
+        role: backup
+      - db: admin
+        role: restore
+
+- name: Create backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ mongodb_backup_single_dir }}"
+    - "{{ mongodb_backup_all_dir }}"
+    - "{{ mongodb_backup_restore_dir }}"
+- name: Create MongoDB Database Tools config
+  ansible.builtin.template:
+    src: mongodb-tools.yml.j2
+    dest: "{{ mongodb_tools_config }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Check mongodump
+  ansible.builtin.command:
+    argv:
+      - mongodump
+      - --version
+  register: mongodb_backup_mongodump_version
+  changed_when: false
+
+- name: Show MongoDB Database Tools version
+  ansible.builtin.debug:
+    msg: "{{ mongodb_backup_mongodump_version.stdout_lines[0] }}"
