@@ -2,4 +2,4 @@
   ansible.builtin.include_tasks: backup_one.yml
   loop: "{{ mongodb_lab_databases }}"
   loop_control:
-    loop_var: backup_database
+    loop_var: mongodb_backup_database
