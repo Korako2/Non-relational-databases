@@ -1,4 +1,4 @@
-- name: "Drop MongoDB collection {{ mongodb_backup_drop_database_name }}.{{ mongodb_backup_drop_collection_name }}"
+- name: "Drop MongoDB collection {{ mongodb_backup_drop_database_name ~ '.' ~ mongodb_backup_drop_collection_name }}"
   community.mongodb.mongodb_shell:
     login_host: "127.0.0.1"
     login_port: "{{ mongodb_port }}"
