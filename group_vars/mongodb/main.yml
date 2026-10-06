@@ -18,7 +18,7 @@ mongodb_backup_user: "backup_user"
 mongodb_lab_databases:
   - "{{ mongodb_university_db }}"
   - "{{ mongodb_reports_db }}"
-  -
+
 mongodb_backup_root: "/var/backups/mongodb"
 mongodb_backup_single_dir: "{{ mongodb_backup_root }}/single"
 mongodb_backup_all_dir: "{{ mongodb_backup_root }}/all"
