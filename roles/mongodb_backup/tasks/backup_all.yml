@@ -1,0 +1,5 @@
+- name: Backup all MongoDB databases
+  ansible.builtin.include_tasks: backup_one.yml
+  loop: "{{ mongodb_lab_databases }}"
+  loop_control:
+    loop_var: backup_database
