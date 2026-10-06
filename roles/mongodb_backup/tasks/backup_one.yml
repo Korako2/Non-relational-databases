@@ -1,9 +1,9 @@
 - name: Validate backup database variable
   ansible.builtin.assert:
     that:
-      - backup_database in mongodb_lab_databases
+      - mongodb_backup_database in mongodb_lab_databases
     fail_msg: >-
-      The {{ backup_database }} variable must be in the mongodb_lab_databases list.
+      The {{ mongodb_backup_database }} variable must be in the mongodb_lab_databases list.
       Please check your configuration.
 
 - name: Generate backup timestamp
@@ -12,12 +12,13 @@
       - date
       - -u
       - "+%d%m%Y_%H%M%S"
-  register: backup_timestamp_command
+  register: mongodb_backup_timestamp_command
   changed_when: false
 
 - name: Set backup filename
   ansible.builtin.set_fact:
-    backup_file: "{{ mongodb_backup_dir }}/{{ backup_database }}_{{ backup_timestamp_command.stdout }}.archive.gz"
+    mongodb_backup_file: >-
+      {{ mongodb_backup_dir }}/{{ mongodb_backup_database }}_{{ mongodb_backup_timestamp_command.stdout }}.archive.gz
 
 - name: Backup database
   ansible.builtin.command:
@@ -34,26 +35,26 @@
       - --config
       - "{{ mongodb_tools_config }}"
       - --db
-      - "{{ backup_database }}"
-      - "--archive={{ backup_file }}"
+      - "{{ mongodb_backup_database }}"
+      - "--archive={{ mongodb_backup_file }}"
       - --gzip
   changed_when: true
 
 - name: Check created backup
   ansible.builtin.stat:
-    path: "{{ backup_file }}"
-  register: backup_stat
+    path: "{{ mongodb_backup_file }}"
+  register: mongodb_backup_stat
 
 - name: Verify backup
   ansible.builtin.assert:
     that:
-      - backup_stat.stat.exists
-      - backup_stat.stat.size > 0
+      - mongodb_backup_stat.stat.exists
+      - mongodb_backup_stat.stat.size > 0
     success_msg: >-
       Backup successfully created:
-      {{ backup_file }}
-      ({{ backup_stat.stat.size }} bytes)
+      {{ mongodb_backup_file }}
+      ({{ mongodb_backup_stat.stat.size }} bytes)
 
 - name: Show backup path
   ansible.builtin.debug:
-    msg: "Created backup: {{ backup_file }}"
+    msg: "Created backup: {{ mongodb_backup_file }}"

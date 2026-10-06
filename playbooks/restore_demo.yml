@@ -39,20 +39,20 @@
         name: mongodb_backup
         tasks_from: backup_one.yml
       vars:
-        backup_database: "{{ restore_database }}"
+        mongodb_backup_database: "{{ restore_database }}"
         mongodb_backup_dir: "{{ mongodb_backup_restore_dir }}"
 
     - name: Save created archive path
       ansible.builtin.set_fact:
-        restore_archive: "{{ backup_file }}"
+        restore_archive: "{{ mongodb_backup_file }}"
 
     - name: Delete collection before restore
       ansible.builtin.include_role:
         name: mongodb_backup
         tasks_from: drop_collection.yml
       vars:
-        drop_database_name: "{{ restore_database }}"
-        drop_collection_name: "{{ restore_collection }}"
+        mongodb_backup_drop_database_name: "{{ restore_database }}"
+        mongodb_backup_drop_collection_name: "{{ restore_collection }}"
 
     - name: Restore deleted collection
       ansible.builtin.include_role:

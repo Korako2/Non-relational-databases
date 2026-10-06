@@ -1,14 +1,14 @@
 - name: Check MongoDB Ansible Python environment
   ansible.builtin.stat:
     path: "{{ mongodb_ansible_python }}"
-  register: mongodb_ansible_python_stat
+  register: mongodb_backup_ansible_python_stat
 
 - name: Verify MongoDB Ansible Python environment exists
   ansible.builtin.assert:
     that:
-      - mongodb_ansible_python_stat.stat.exists
+      - mongodb_backup_ansible_python_stat.stat.exists
     fail_msg: >-
-      MongoDB Ansible Python environment does not exist at {{ mongodb_ansible_python }}. 
+      MongoDB Ansible Python environment does not exist at {{ mongodb_ansible_python }}.
       Run playbooks/rbac.yml to set up the required Python environment before running this playbook.
 
 - name: Install MongoDB database tools
@@ -17,7 +17,7 @@
     state: present
     update_cache: true
 
-- name: create MongoDB backup user
+- name: Create MongoDB backup user
   ansible.builtin.include_role:
     name: mongodb_rbac
     tasks_from: create_user.yml
@@ -55,9 +55,9 @@
     argv:
       - mongodump
       - --version
-  register: mongodump_version
+  register: mongodb_backup_mongodump_version
   changed_when: false
 
 - name: Show MongoDB Database Tools version
   ansible.builtin.debug:
-    msg: "{{ mongodump_version.stdout_lines[0] }}"
+    msg: "{{ mongodb_backup_mongodump_version.stdout_lines[0] }}"

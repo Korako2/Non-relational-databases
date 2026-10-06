@@ -3,7 +3,7 @@
   become: true
   gather_facts: false
   vars:
-    backup_database: "{{ mongodb_university_db }}"
+    mongodb_backup_database: "{{ mongodb_university_db }}"
     mongodb_backup_dir: "{{ mongodb_backup_single_dir }}"
   tasks:
     - name: Run MongoDB single database backup
