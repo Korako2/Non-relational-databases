@@ -1,0 +1,28 @@
+- name: "Drop MongoDB collection {{ drop_collection_name }} in database {{ drop_database_name }}"
+  community.mongodb.mongodb_shell:
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    login_database: admin
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    db: "{{ drop_database_name }}"
+    eval: |
+      db.getCollection("{{ drop_collection_name }}").drop()
+  no_log: true
+
+- name: Verify MongoDB collection was deleted
+  community.mongodb.mongodb_shell:
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    login_database: admin
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    db: "{{ drop_database_name }}"
+    stringify: false
+    eval: |
+      if (db.getCollectionNames().includes("{{ drop_collection_name }}")) {
+        throw new Error(
+          "Collection {{ drop_collection_name }} still exists"
+        );
+      }
+  no_log: true
