@@ -1,0 +1,100 @@
+- name: Download Percona Monitoring and Management (PMM) installation script
+  ansible.builtin.get_url:
+    url: "{{ mongodb_pmm_client_download_url }}"
+    dest: /tmp/mongodb_exporter.deb
+    mode: '0644'
+    force: yes
+
+- name: Install Percona Monitoring and Management (PMM) client
+  ansible.builtin.apt:
+    deb: "/tmp/mongodb_exporter.deb"
+    state: present
+
+- name: Verify MongoDB Exporter binary
+  ansible.builtin.stat:
+    path: /usr/bin/mongodb_exporter
+  register: exporter_binary
+
+- name: Assert MongoDB Exporter is installed
+  ansible.builtin.assert:
+    that:
+      - exporter_binary.stat.exists
+
+- name: Create PMM monitoring role
+  ansible.builtin.include_role:
+    name: mongodb_rbac
+    tasks_from: create_role.yml
+  vars:
+    mongodb_rbac_role_name: "{{ mongodb_monitoring_role_name }}"
+    mongodb_rbac_role_database: admin
+    mongodb_rbac_role_privileges:
+      - resource:
+          db: ""
+          collection: ""
+        actions:
+        - "collStats"
+        - "dbHash"
+        - "dbStats"
+        - "indexStats"
+        - "find"
+        - "listIndexes"
+        - "listCollections"
+      - resource:
+          db: ""
+          collection: "system.version"
+        actions:
+          - "find"
+      - resource:
+          db: ""
+          collection: "system.profile"
+        actions:
+          - "find"
+          - "dbStats"
+          - "collStats"
+          - "indexStats"
+    mongodb_rbac_role_inherited_roles: []
+
+- name: Create PMM monitoring user
+  ansible.builtin.include_role:
+    name: mongodb_rbac
+    tasks_from: create_user.yml
+  vars:
+    mongodb_rbac_user_database: admin
+    mongodb_rbac_user_name: "{{ mongodb_monitoring_user_name }}"
+    mongodb_rbac_user_password: "{{ vault_mongodb_monitoring_password }}"
+    mongodb_rbac_user_roles:
+      - db: admin
+        role: pmmMonitor
+      - db: admin
+        role: clusterMonitor
+      - db: admin
+        role: directShardOperations
+      - db: local
+        role: read
+
+- name: Create MongoDB Exporter env file
+  ansible.builtin.template:
+    src: mongodb-exporter.env.j2
+    dest: /etc/default/mongodb_exporter
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart MongoDB Exporter
+
+- name: Install MongoDB Exporter systemd service
+  ansible.builtin.template:
+    src: mongodb-exporter.service.j2
+    dest: /etc/systemd/system/mongodb_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart MongoDB Exporter
+
+- name: Enable and start MongoDB Exporter service
+  ansible.builtin.systemd:
+    name: mongodb_exporter
+    enabled: true
+    state: started
