@@ -1,0 +1,88 @@
+- name: Install Prometheus
+  ansible.builtin.apt:
+    name: prometheus
+    state: present
+  become: true
+
+- name: Start Prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true
+  become: true
+
+- name: Configure Prometheus to scrape MongoDB Exporter
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+  notify:
+    - Restart Prometheus
+
+- name: Create Prometheus systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Bind Prometheus to localhost
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus \
+        --storage.tsdb.retention.time=2d \
+        --web.listen-address=127.0.0.1:{{ prometheus_port }}
+  notify:
+    - Reload systemd
+    - Restart Prometheus
+
+- name: Enable Prometheus
+  ansible.builtin.systemd_service:
+    name: prometheus
+    enabled: true
+    state: started
+  become: true
+
+- name: Create Prometheus systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Bind Prometheus to localhost
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus \
+        --storage.tsdb.retention.time=2d \
+        --web.listen-address=127.0.0.1:{{ prometheus_port }}
+  notify:
+    - Reload systemd
+    - Restart Prometheus
+
+- name: Enable Prometheus
+  ansible.builtin.systemd_service:
+    name: prometheus
+    enabled: true
+    state: started
+
