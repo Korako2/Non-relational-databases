@@ -9,6 +9,5 @@
         host: "127.0.0.1"
         port: "{{ mongodb_port }}"
         timeout: 5
-
   roles:
     - mongodb_monitoring

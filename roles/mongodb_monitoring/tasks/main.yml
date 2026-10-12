@@ -98,3 +98,7 @@
     name: mongodb_exporter
     enabled: true
     state: started
+
+- name: Configure Prometheus
+  ansible.builtin.include_tasks:
+    start_prometheus.yml

@@ -6,7 +6,7 @@ Requires=mongod.service
 [Service]
 Type=simple
 
-EnvironmentFile=/etc/default/mongodb_exporter.env
+EnvironmentFile=/etc/default/mongodb_exporter
 
 ExecStart=/usr/bin/mongodb_exporter --mongodb.uri={{ mongodb_uri }} \
     --web.listen-address={{ mongodb_exporter_listen_address }} \
