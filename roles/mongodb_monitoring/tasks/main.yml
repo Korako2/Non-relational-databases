@@ -1,14 +1,20 @@
-- name: Download Percona Monitoring and Management (PMM) installation script
+- name: Check if MongoDB Exporter is already installed
+  ansible.builtin.stat:
+    path: /usr/bin/mongodb_exporter
+  register: exporter_binary
+
+- name: Download MongoDB Exporter package
   ansible.builtin.get_url:
     url: "{{ mongodb_pmm_client_download_url }}"
     dest: /tmp/mongodb_exporter.deb
-    mode: '0644'
-    force: yes
+    mode: "0644"
+  when: not exporter_binary.stat.exists
 
-- name: Install Percona Monitoring and Management (PMM) client
+- name: Install MongoDB Exporter
   ansible.builtin.apt:
-    deb: "/tmp/mongodb_exporter.deb"
+    deb: /tmp/mongodb_exporter.deb
     state: present
+  when: not exporter_binary.stat.exists
 
 - name: Verify MongoDB Exporter binary
   ansible.builtin.stat:
@@ -19,6 +25,8 @@
   ansible.builtin.assert:
     that:
       - exporter_binary.stat.exists
+    fail_msg: "MongoDB Exporter installation failed"
+    success_msg: "MongoDB Exporter is installed"
 
 - name: Create PMM monitoring role
   ansible.builtin.include_role:
@@ -102,3 +110,7 @@
 - name: Configure Prometheus
   ansible.builtin.include_tasks:
     start_prometheus.yml
+
+- name: Configure Grafana
+  ansible.builtin.include_tasks:
+    start_grafana.yml
