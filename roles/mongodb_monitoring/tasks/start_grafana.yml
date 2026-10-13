@@ -20,11 +20,11 @@
     signed_by: https://apt.grafana.com/gpg-full.key
     state: present
 
-- name: Install Grafana
-  ansible.builtin.apt:
-    name: grafana
-    state: present
-    update_cache: true
+  - name: Install Grafana
+    ansible.builtin.apt:
+      name: grafana
+      state: present
+      update_cache: true
 
 - name: Bind Grafana to localhost
   ansible.builtin.lineinfile:
@@ -62,6 +62,15 @@
     src: grafana-dashboard-provider.yml
     dest: /etc/grafana/provisioning/dashboards/mongodb.yml
     owner: root
+    group: grafana
+    mode: "0644"
+  notify: Restart Grafana
+
+- name: Install MongoDB Grafana dashboard
+  ansible.builtin.copy:
+    src: mongodb-lab-dashboard.json
+    dest: /var/lib/grafana/dashboards/mongodb-lab.json
+    owner: grafana
     group: grafana
     mode: "0644"
   notify: Restart Grafana
