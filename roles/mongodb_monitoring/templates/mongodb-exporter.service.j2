@@ -8,8 +8,8 @@ Type=simple
 
 EnvironmentFile=/etc/default/mongodb_exporter
 
-ExecStart=/usr/bin/mongodb_exporter --mongodb.uri={{ mongodb_uri }} \
-    --web.listen-address={{ mongodb_exporter_listen_address }} \
+ExecStart=/usr/bin/mongodb_exporter --mongodb.uri={{ mongodb_monitoring_uri }} \
+    --web.listen-address={{ mongodb_monitoring_exporter_listen_address }} \
     --compatible-mode \
     --collector.diagnosticdata \
     --collector.dbstats \

@@ -1,30 +1,30 @@
 - name: Check if MongoDB Exporter is already installed
   ansible.builtin.stat:
     path: /usr/bin/mongodb_exporter
-  register: exporter_binary
+  register: mongodb_monitoring_exporter_binary
 
 - name: Download MongoDB Exporter package
   ansible.builtin.get_url:
-    url: "{{ mongodb_pmm_client_download_url }}"
+    url: "{{ mongodb_monitoring_pmm_client_download_url }}"
     dest: /tmp/mongodb_exporter.deb
     mode: "0644"
-  when: not exporter_binary.stat.exists
+  when: not mongodb_monitoring_exporter_binary.stat.exists
 
 - name: Install MongoDB Exporter
   ansible.builtin.apt:
     deb: /tmp/mongodb_exporter.deb
     state: present
-  when: not exporter_binary.stat.exists
+  when: not mongodb_monitoring_exporter_binary.stat.exists
 
 - name: Verify MongoDB Exporter binary
   ansible.builtin.stat:
     path: /usr/bin/mongodb_exporter
-  register: exporter_binary
+  register: mongodb_monitoring_exporter_binary
 
 - name: Assert MongoDB Exporter is installed
   ansible.builtin.assert:
     that:
-      - exporter_binary.stat.exists
+      - mongodb_monitoring_exporter_binary.stat.exists
     fail_msg: "MongoDB Exporter installation failed"
     success_msg: "MongoDB Exporter is installed"
 
@@ -40,13 +40,13 @@
           db: ""
           collection: ""
         actions:
-        - "collStats"
-        - "dbHash"
-        - "dbStats"
-        - "indexStats"
-        - "find"
-        - "listIndexes"
-        - "listCollections"
+          - "collStats"
+          - "dbHash"
+          - "dbStats"
+          - "indexStats"
+          - "find"
+          - "listIndexes"
+          - "listCollections"
       - resource:
           db: ""
           collection: "system.version"
