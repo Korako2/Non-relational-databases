@@ -1,0 +1,13 @@
+- name: Configure MongoDB monitoring
+  hosts: mongodb
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Check MongoDB
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ mongodb_port }}"
+        timeout: 5
+  roles:
+    - mongodb_monitoring

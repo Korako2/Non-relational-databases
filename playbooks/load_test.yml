@@ -1,0 +1,46 @@
+- name: Generate MongoDB workload
+  hosts: mongodb
+  become: true
+  gather_facts: false
+  vars:
+    mongodb_load_duration: 180
+    mongodb_load_workers: 4
+
+  tasks:
+    - name: Check workload generator exists
+      ansible.builtin.stat:
+        path: /opt/mongodb-lab/load.py
+      register: load_script
+
+    - name: Verify workload generator
+      ansible.builtin.assert:
+        that:
+          - load_script.stat.exists
+        fail_msg: "Run monitoring_setup.yml first"
+
+    - name: Show workload parameters
+      ansible.builtin.debug:
+        msg: >-
+          Starting MongoDB load test:
+          {{ mongodb_load_workers }} workers,
+          {{ mongodb_load_duration }} seconds.
+
+    - name: Run MongoDB workload
+      ansible.builtin.command:
+        argv:
+          - "{{ mongodb_ansible_python }}"
+          - /opt/mongodb-lab/load.py
+          - --duration
+          - "{{ mongodb_load_duration | string }}"
+          - --workers
+          - "{{ mongodb_load_workers | string }}"
+      environment:
+        MONGO_LOAD_PASSWORD: "{{ vault_mongodb_load_password }}"
+      async: "{{ (mongodb_load_duration | int) + 60 }}"
+      poll: 5
+      changed_when: true
+      no_log: true
+
+    - name: Report workload completion
+      ansible.builtin.debug:
+        msg: "MongoDB workload completed successfully."
