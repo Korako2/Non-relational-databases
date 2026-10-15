@@ -1,5 +1,6 @@
 ansible_host: "{{ lookup('ansible.builtin.env', 'SERVER_IP') }}"
 ansible_user: "{{ lookup('ansible.builtin.env', 'SERVER_USER') }}"
+ansible_port: "{{ lookup('ansible.builtin.env', 'SERVER_PORT') }}"
 ansible_ssh_private_key_file: "{{ lookup('ansible.builtin.env', 'SSH_KEY') | default('~/.ssh/id_ed25519', true) }}"
 mongodb_port: 27017
 mongodb_bind_ip: "127.0.0.1"
@@ -25,3 +26,12 @@ mongodb_backup_all_dir: "{{ mongodb_backup_root }}/all"
 mongodb_backup_restore_dir: "{{ mongodb_backup_root }}/restore-demo"
 
 mongodb_tools_config: "/etc/mongodb-backup-tools.yml"
+
+mongodb_monitor_user: "metrics_exporter"
+mongodb_exporter_version: "0.53.0"
+mongodb_exporter_port: 9216
+prometheus_port: 9090
+grafana_port: 3000
+mongodb_load_user: "load_user"
+mongodb_monitoring_role_name: "pmmMonitor"
+mongodb_monitoring_user_name: "pmm"
