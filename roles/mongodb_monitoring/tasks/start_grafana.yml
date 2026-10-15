@@ -20,11 +20,11 @@
     signed_by: https://apt.grafana.com/gpg-full.key
     state: present
 
-  - name: Install Grafana
-    ansible.builtin.apt:
-      name: grafana
-      state: present
-      update_cache: true
+- name: Install Grafana
+  ansible.builtin.apt:
+    name: grafana
+    state: present
+    update_cache: true
 
 - name: Bind Grafana to localhost
   ansible.builtin.lineinfile:
@@ -74,3 +74,9 @@
     group: grafana
     mode: "0644"
   notify: Restart Grafana
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd_service:
+    name: grafana-server
+    enabled: true
+    state: started

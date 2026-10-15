@@ -1,0 +1,52 @@
+- name: Check MongoDB monitoring stack
+  hosts: mongodb
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check MongoDB Exporter metrics
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ mongodb_exporter_port }}/metrics"
+        return_content: true
+        status_code: 200
+      register: exporter_response
+      changed_when: false
+
+    - name: Verify MongoDB is available
+      ansible.builtin.assert:
+        that:
+          - >-
+            (exporter_response.content |
+            regex_search('(?m)^mongodb_up(?:\{[^}]*\})?\s+1(?:\.0)?\s*$'))
+            is not none
+        success_msg: "MongoDB Exporter: mongodb_up = 1"
+        fail_msg: "MongoDB Exporter cannot access MongoDB"
+
+    - name: Check Prometheus MongoDB target
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ prometheus_port }}/api/v1/query?query=up%7Bjob%3D%22mongodb%22%7D"
+        return_content: true
+      register: prometheus_response
+      changed_when: false
+      retries: 10
+      delay: 3
+      until: >-
+        prometheus_response.status == 200 and
+        prometheus_response.json.status == 'success' and
+        (prometheus_response.json.data.result | length) > 0 and
+        prometheus_response.json.data.result[0].value[1] == '1'
+
+    - name: Check Grafana
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}/api/health"
+        status_code: 200
+      register: grafana_response
+      changed_when: false
+
+    - name: Show monitoring status
+      ansible.builtin.debug:
+        msg:
+          - "MongoDB Exporter: OK"
+          - "Prometheus: MongoDB target UP"
+          - "Grafana: HTTP {{ grafana_response.status }}"
+          - "Monitoring stack is working"

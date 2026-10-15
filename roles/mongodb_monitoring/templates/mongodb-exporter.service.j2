@@ -10,7 +10,8 @@ EnvironmentFile=/etc/default/mongodb_exporter
 
 ExecStart=/usr/bin/mongodb_exporter --mongodb.uri={{ mongodb_uri }} \
     --web.listen-address={{ mongodb_exporter_listen_address }} \
-     --collector.diagnosticdata \
+    --compatible-mode \
+    --collector.diagnosticdata \
     --collector.dbstats \
     --collector.topmetrics \
     --collector.currentopmetrics
