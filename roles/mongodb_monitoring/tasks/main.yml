@@ -104,6 +104,7 @@
 - name: Enable and start MongoDB Exporter service
   ansible.builtin.systemd:
     name: mongodb_exporter
+    daemon_reload: true
     enabled: true
     state: started
 
@@ -114,3 +115,45 @@
 - name: Configure Grafana
   ansible.builtin.include_tasks:
     start_grafana.yml
+
+- name: Create MongoDB load test user
+  community.mongodb.mongodb_user:
+    database: admin
+
+    name: "{{ mongodb_load_user }}"
+    password: "{{ vault_mongodb_load_password }}"
+
+    roles:
+      - db: "{{ mongodb_university_db }}"
+        role: readWrite
+
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    login_database: admin
+
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+
+    update_password: on_create
+    state: present
+
+  vars:
+    ansible_python_interpreter: "{{ mongodb_ansible_python }}"
+
+  no_log: true
+
+- name: Create MongoDB lab directory
+  ansible.builtin.file:
+    path: /opt/mongodb-lab
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install MongoDB workload generator
+  ansible.builtin.template:
+    src: load.py.j2
+    dest: /opt/mongodb-lab/load.py
+    owner: root
+    group: root
+    mode: "0755"
