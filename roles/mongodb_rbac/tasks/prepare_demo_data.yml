@@ -1,0 +1,67 @@
+---
+- name: Prepare education demo data
+  community.mongodb.mongodb_shell:
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    login_database: admin
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+    db: "{{ mongodb_university_db }}"
+    eval: |
+      db.students.updateOne(
+        { _id: 1 },
+        {
+          $set: {
+            name: "Ivan Ivanov",
+            course: 2
+          }
+        },
+        { upsert: true }
+      ),
+
+      db.teachers.updateOne(
+        { _id: 1 },
+        {
+          $set: {
+            name: "Petr Petrov",
+            department: "Computer Science"
+          }
+        },
+        { upsert: true }
+      ),
+
+      db.courses.updateOne(
+        { _id: 1 },
+        {
+          $set: {
+            name: "Non-relational databases"
+          }
+        },
+        { upsert: true }
+      )
+
+  no_log: true
+
+- name: Prepare reports demo data
+  community.mongodb.mongodb_shell:
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    login_database: admin
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+
+    db: "{{ mongodb_reports_db }}"
+
+    eval: |
+      db.monthly_reports.updateOne(
+        { _id: 1 },
+        {
+          $set: {
+            month: "October",
+            studentsCount: 100
+          }
+        },
+        { upsert: true }
+      )
+
+  no_log: true

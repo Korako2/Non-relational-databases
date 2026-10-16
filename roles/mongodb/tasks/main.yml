@@ -1,0 +1,92 @@
+- name: Validate operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+      - ansible_facts["distribution_release"] in ["focal", "jammy", "noble"]
+    fail_msg: >-
+      Unsupported operating system:
+      {{ ansible_facts["distribution"] }}
+      {{ ansible_facts["distribution_version"] }}
+    success_msg: >-
+      Supported operating system:
+      {{ ansible_facts["distribution"] }}
+      {{ ansible_facts["distribution_version"] }}
+
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name:
+#      - ca-certificates
+      - curl
+      - gnupg
+      - python3-debian
+    state: present
+    update_cache: true
+
+- name: Add MongoDB APT repository
+  ansible.builtin.deb822_repository:
+    name: "mongodb-org-{{ mongodb_major_version }}"
+    types:
+      - deb
+    uris:
+      - https://repo.mongodb.org/apt/ubuntu
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}/mongodb-org/{{ mongodb_major_version }}"
+    components:
+      - multiverse
+    architectures:
+      - amd64
+      - arm64
+    signed_by: "https://pgp.mongodb.com/server-{{ mongodb_major_version }}.asc"
+    state: present
+
+- name: Install MongoDB
+  ansible.builtin.apt:
+    name: mongodb-org
+    state: present
+    update_cache: true
+
+- name: Configure MongoDB
+  ansible.builtin.template:
+    src: mongod.conf.j2
+    dest: /etc/mongod.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart MongoDB
+
+- name: Enable and start MongoDB
+  ansible.builtin.systemd_service:
+    name: mongod
+    enabled: true
+    state: started
+
+- name: Apply pending handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for MongoDB port
+  ansible.builtin.wait_for:
+    host: "{{ mongodb_bind_ip }}"
+    port: "{{ mongodb_port }}"
+    timeout: 30
+
+- name: Check MongoDB with ping command
+  ansible.builtin.command:
+    argv:
+      - mongosh
+      - --quiet
+      - --host
+      - "{{ mongodb_bind_ip }}"
+      - --port
+      - "{{ mongodb_port | string }}"
+      - --eval
+      - "db.adminCommand({ ping: 1 }).ok"
+  register: mongodb_ping
+  changed_when: false
+
+- name: Verify MongoDB response
+  ansible.builtin.assert:
+    that:
+      - mongodb_ping.rc == 0
+      - mongodb_ping.stdout | trim == "1"
+    success_msg: "MongoDB is available and responding to ping."
+    fail_msg: "MongoDB health check failed."

@@ -1,0 +1,159 @@
+- name: Check if MongoDB Exporter is already installed
+  ansible.builtin.stat:
+    path: /usr/bin/mongodb_exporter
+  register: mongodb_monitoring_exporter_binary
+
+- name: Download MongoDB Exporter package
+  ansible.builtin.get_url:
+    url: "{{ mongodb_monitoring_pmm_client_download_url }}"
+    dest: /tmp/mongodb_exporter.deb
+    mode: "0644"
+  when: not mongodb_monitoring_exporter_binary.stat.exists
+
+- name: Install MongoDB Exporter
+  ansible.builtin.apt:
+    deb: /tmp/mongodb_exporter.deb
+    state: present
+  when: not mongodb_monitoring_exporter_binary.stat.exists
+
+- name: Verify MongoDB Exporter binary
+  ansible.builtin.stat:
+    path: /usr/bin/mongodb_exporter
+  register: mongodb_monitoring_exporter_binary
+
+- name: Assert MongoDB Exporter is installed
+  ansible.builtin.assert:
+    that:
+      - mongodb_monitoring_exporter_binary.stat.exists
+    fail_msg: "MongoDB Exporter installation failed"
+    success_msg: "MongoDB Exporter is installed"
+
+- name: Create PMM monitoring role
+  ansible.builtin.include_role:
+    name: mongodb_rbac
+    tasks_from: create_role.yml
+  vars:
+    mongodb_rbac_role_name: "{{ mongodb_monitoring_role_name }}"
+    mongodb_rbac_role_database: admin
+    mongodb_rbac_role_privileges:
+      - resource:
+          db: ""
+          collection: ""
+        actions:
+          - "collStats"
+          - "dbHash"
+          - "dbStats"
+          - "indexStats"
+          - "find"
+          - "listIndexes"
+          - "listCollections"
+      - resource:
+          db: ""
+          collection: "system.version"
+        actions:
+          - "find"
+      - resource:
+          db: ""
+          collection: "system.profile"
+        actions:
+          - "find"
+          - "dbStats"
+          - "collStats"
+          - "indexStats"
+    mongodb_rbac_role_inherited_roles: []
+
+- name: Create PMM monitoring user
+  ansible.builtin.include_role:
+    name: mongodb_rbac
+    tasks_from: create_user.yml
+  vars:
+    mongodb_rbac_user_database: admin
+    mongodb_rbac_user_name: "{{ mongodb_monitoring_user_name }}"
+    mongodb_rbac_user_password: "{{ vault_mongodb_monitoring_password }}"
+    mongodb_rbac_user_roles:
+      - db: admin
+        role: pmmMonitor
+      - db: admin
+        role: clusterMonitor
+      - db: admin
+        role: directShardOperations
+      - db: local
+        role: read
+
+- name: Create MongoDB Exporter env file
+  ansible.builtin.template:
+    src: mongodb-exporter.env.j2
+    dest: /etc/default/mongodb_exporter
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart MongoDB Exporter
+
+- name: Install MongoDB Exporter systemd service
+  ansible.builtin.template:
+    src: mongodb-exporter.service.j2
+    dest: /etc/systemd/system/mongodb_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart MongoDB Exporter
+
+- name: Enable and start MongoDB Exporter service
+  ansible.builtin.systemd:
+    name: mongodb_exporter
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Configure Prometheus
+  ansible.builtin.include_tasks:
+    start_prometheus.yml
+
+- name: Configure Grafana
+  ansible.builtin.include_tasks:
+    start_grafana.yml
+
+- name: Create MongoDB load test user
+  community.mongodb.mongodb_user:
+    database: admin
+
+    name: "{{ mongodb_load_user }}"
+    password: "{{ vault_mongodb_load_password }}"
+
+    roles:
+      - db: "{{ mongodb_university_db }}"
+        role: readWrite
+
+    login_host: "127.0.0.1"
+    login_port: "{{ mongodb_port }}"
+    login_database: admin
+
+    login_user: "{{ mongodb_admin_user }}"
+    login_password: "{{ vault_mongodb_admin_password }}"
+
+    update_password: on_create
+    state: present
+
+  vars:
+    ansible_python_interpreter: "{{ mongodb_ansible_python }}"
+
+  no_log: true
+
+- name: Create MongoDB lab directory
+  ansible.builtin.file:
+    path: /opt/mongodb-lab
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install MongoDB workload generator
+  ansible.builtin.template:
+    src: load.py.j2
+    dest: /opt/mongodb-lab/load.py
+    owner: root
+    group: root
+    mode: "0755"
