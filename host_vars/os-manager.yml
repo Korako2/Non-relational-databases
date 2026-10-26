@@ -1,0 +1,3 @@
+ansible_port: "{{ lookup('ansible.builtin.env', 'OS_MANAGER_SSH_PORT') | default('2224', true) | int }}"
+os_heap: 1g
+os_tier: none
