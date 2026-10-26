@@ -1,3 +1,19 @@
 ansible_host: "{{ lookup('ansible.builtin.env', 'VBOX_SSH_HOST') | default('127.0.0.1', true) }}"
 ansible_user: "{{ lookup('ansible.builtin.env', 'VBOX_SSH_USER') | default('vboxuser', true) }}"
 ansible_python_interpreter: /usr/bin/python3
+
+os_version: '3.9.0'
+os_cluster_name: opensearch-lab
+os_manager_nodes:
+  - os-hot
+  - os-warm
+  - os-manager
+os_roles:
+  os-hot: [cluster_manager, data, ingest]
+  os-warm: [cluster_manager, data]
+  os-manager: [cluster_manager]
+os_node_dn_prefix: "CN="
+os_admin_dn: "CN=ansible-admin"
+os_security_path: /etc/opensearch/opensearch-security
+os_cert_path: /etc/opensearch/certs
+os_dashboard_cert_path: /etc/opensearch-dashboards/certs
