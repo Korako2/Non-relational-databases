@@ -1,0 +1,10 @@
+- name: Validate the three-node inventory
+  ansible.builtin.assert:
+    that:
+    - groups['opensearch'] | length == 3
+    - groups['dashboards'] | length == 1
+    - groups['dashboards'][0] in groups['opensearch']
+    - groups['opensearch'] | difference(os_manager_nodes) | length == 0
+    - groups['opensearch'] | select('in', os_manager_nodes) | list | length == 3
+    fail_msg: Expected os-hot, os-warm and os-manager, with Dashboards on os-manager.
+
