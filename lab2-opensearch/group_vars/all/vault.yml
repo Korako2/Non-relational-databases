@@ -1,5 +1,0 @@
-vault_admin_password: "admin-password!"
-vault_dashboards_password: "dashboard-password!"
-rbac_writer_password: "rbac_writer_password!"
-rbac_reader_password: "rbac_reader_password!"
-rbac_monitor_password: "rbac_monitor_password!"
