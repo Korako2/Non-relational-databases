@@ -1,10 +1,20 @@
 - name: Validate the three-node inventory
   ansible.builtin.assert:
     that:
-    - groups['opensearch'] | length == 3
+    - groups['os-cluster'] | length == 3
     - groups['dashboards'] | length == 1
-    - groups['dashboards'][0] in groups['opensearch']
-    - groups['opensearch'] | difference(os_manager_nodes) | length == 0
-    - groups['opensearch'] | select('in', os_manager_nodes) | list | length == 3
+    - groups['dashboards'][0] in groups['os-cluster']
     fail_msg: Expected os-hot, os-warm and os-manager, with Dashboards on os-manager.
 
+- name: Check local Java (required by upstream TLS generation tool)
+  ansible.builtin.command: java -version
+  register: local_java
+  changed_when: false
+  failed_when: false
+
+- name: Require local Java 21 or later
+  ansible.builtin.assert:
+    that:
+      - local_java.rc == 0
+      - (local_java.stderr | regex_search('version "([0-9]+)', '\\1') | first | int) >= 21
+    fail_msg: 'Install a Java 21+ JRE/JDK on the Ansible controller; upstream Search Guard TLS Tool runs locally.'

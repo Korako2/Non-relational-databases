@@ -1,19 +1,22 @@
-ansible_host: "{{ lookup('ansible.builtin.env', 'VBOX_SSH_HOST') | default('127.0.0.1', true) }}"
-ansible_user: "{{ lookup('ansible.builtin.env', 'VBOX_SSH_USER') | default('vboxuser', true) }}"
 ansible_python_interpreter: /usr/bin/python3
 
-os_version: '3.9.0'
 os_cluster_name: opensearch-lab
-os_manager_nodes:
-  - os-hot
-  - os-warm
-  - os-manager
-os_roles:
-  os-hot: [cluster_manager, data, ingest]
-  os-warm: [cluster_manager, data]
-  os-manager: [cluster_manager]
-os_node_dn_prefix: "CN="
-os_admin_dn: "CN=ansible-admin"
-os_security_path: /etc/opensearch/opensearch-security
-os_cert_path: /etc/opensearch/certs
-os_dashboard_cert_path: /etc/opensearch-dashboards/certs
+os_download_url: https://artifacts.opensearch.org/releases/bundle/opensearch
+os_version: '3.9.0'
+os_dashboards_version: '3.9.0'
+domain_name: lab.internal
+cluster_type: multi-node
+os_user: opensearch
+os_dashboards_user: opensearch-dashboards
+cert_valid_days: 730
+auth_type: internal
+copy_custom_security_configs: false
+iac_enable: false
+populate_inventory_to_hosts_file: true
+
+admin_password: "{{ vault_admin_password }}"
+kibanaserver_password: "{{ vault_dashboards_password }}"
+
+lab_dashboards_conf_dir: /usr/share/opensearch-dashboards/config
+lab_opensearch_conf_dir: /usr/share/opensearch/config
+custom_security_plugin_configs: []
