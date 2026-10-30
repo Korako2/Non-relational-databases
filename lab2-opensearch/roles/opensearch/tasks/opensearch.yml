@@ -1,0 +1,78 @@
+---
+- name: OpenSearch Install | Download opensearch {{ os_version }}
+  ansible.builtin.get_url:
+    url: "{{ os_download_url }}/{{ os_version }}/opensearch-{{ os_version }}-linux-x64.tar.gz"
+    dest: /tmp/opensearch.tar.gz
+    mode: "0644"
+  register: opensearch_download
+
+- name: Check OpenSearch executable
+  ansible.builtin.stat:
+    path: "{{ opensearch_os_home }}/bin/opensearch"
+  register: opensearch_binary
+
+- name: OpenSearch Install | Check installed executable
+  ansible.builtin.stat:
+    path: "{{ opensearch_os_home }}/bin/opensearch"
+  register: opensearch_os_installed_binary
+
+- name: OpenSearch Install | Create opensearch user
+  ansible.builtin.user:
+    name: "{{ os_user }}"
+    state: present
+    shell: /bin/false
+    create_home: true
+    home: "{{ opensearch_os_home }}"
+
+- name: OpenSearch Install | Create home directory
+  ansible.builtin.file:
+    path: "{{ opensearch_os_home }}"
+    state: directory
+    owner: "{{ os_user }}"
+    group: "{{ os_user }}"
+    mode: "0755"
+
+- name: OpenSearch Install | Extract the tar file
+  when: opensearch_download.changed or iac_enable or not opensearch_binary.stat.exists
+  ansible.builtin.unarchive:
+    src: /tmp/opensearch.tar.gz
+    dest: "{{ opensearch_os_home }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+
+- name: OpenSearch Install | Copy Configuration File
+  ansible.builtin.blockinfile:
+    block: "{{ lookup('template', 'templates/opensearch-' ~ cluster_type ~ '.yml') }}"
+    dest: "{{ opensearch_os_conf_dir }}/opensearch.yml"
+    backup: true
+    state: present
+    create: true
+    marker: "## {mark} opensearch main configuration ##"
+    owner: "{{ os_user }}"
+    group: "{{ os_user }}"
+    mode: "0600"
+
+- name: OpenSearch Install | Copy jvm.options File for Instance
+  ansible.builtin.template:
+    src: jvm.options
+    dest: "{{ opensearch_os_conf_dir }}/jvm.options"
+    owner: "{{ os_user }}"
+    group: "{{ os_user }}"
+    mode: "0600"
+    force: true
+
+- name: Create custom OpenSearch tmp directory
+  ansible.builtin.file:
+    path: "{{ custom_tmp_dir }}"
+    state: directory
+    owner: "{{ os_user }}"
+    group: "{{ os_user }}"
+    mode: "0755"
+  when: custom_tmp_dir is defined
+
+- name: OpenSearch Install | create systemd service
+  ansible.builtin.template:
+    src: opensearch.service
+    dest: "{{ opensearch_systemctl_path }}/opensearch.service"
+    mode: "0644"
