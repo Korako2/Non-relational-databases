@@ -2,23 +2,13 @@
 - name: Add Hot/Warm allocation attribute only on data nodes
   ansible.builtin.lineinfile:
     path: /usr/share/opensearch/config/opensearch.yml
-    regexp: '^node\.attr\.temp:'
-    line: 'node.attr.temp: {{ os_tier }}'
+    regexp: "^node\\.attr\\.temp:"
+    line: "node.attr.temp: {{ os_tier }}"
     insertafter: EOF
     state: "{{ 'present' if os_tier in ['hot', 'warm'] else 'absent' }}"
     backup: true
-  register: allocation_attribute
+  register: lab_hot_warm_allocation_attribute
+  notify: Restart opensearch after configuration changes
 
-- name: Restart changed node sequentially to preserve cluster-manager quorum
-  ansible.builtin.systemd:
-    name: opensearch
-    state: restarted
-  when: allocation_attribute.changed
-
-- name: Wait for node REST TLS port after changing tier
-  ansible.builtin.wait_for:
-    host: '{{ ip }}'
-    port: 9200
-    delay: 2
-    timeout: 180
-  when: allocation_attribute.changed
+- name: Apply pending opensearch restart
+  ansible.builtin.meta: flush_handlers

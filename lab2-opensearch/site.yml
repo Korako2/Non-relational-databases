@@ -1,6 +1,13 @@
-- import_playbook: playbooks/00-check-configuration.yml
-- import_playbook: playbooks/02-opensearch.yml
-- import_playbook: playbooks/03-dashboards.yml
-- import_playbook: playbooks/04-hot-warm.yml
-- import_playbook: playbooks/05-dashboards-tls.yml
-- import_playbook: playbooks/06-verify.yml
+---
+- name: 00-check_configuration
+  ansible.builtin.import_playbook: playbooks/00-check-configuration.yml
+- name: 02-opensearch
+  ansible.builtin.import_playbook: playbooks/02-opensearch.yml
+- name: 03-dashboards
+  ansible.builtin.import_playbook: playbooks/03-dashboards.yml
+- name: 04-hot-warm
+  ansible.builtin.import_playbook: playbooks/04-hot-warm.yml
+- name: 05-dashboards-tls
+  ansible.builtin.import_playbook: playbooks/05-dashboards-tls.yml
+- name: 06-verify
+  ansible.builtin.import_playbook: playbooks/06-verify.yml

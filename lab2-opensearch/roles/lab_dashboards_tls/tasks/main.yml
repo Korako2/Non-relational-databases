@@ -1,20 +1,22 @@
+---
 - name: Set paths for HTTPS material
   ansible.builtin.set_fact:
-    dashboard_key: "{{ lab_dashboards_conf_dir }}/dashboards-server.key"
-    dashboard_csr: "{{ lab_dashboards_conf_dir }}/dashboards-server.csr"
-    dashboard_cert: "{{ lab_dashboards_conf_dir }}/dashboards-server.pem"
-    dashboard_ca: "{{ lab_dashboards_conf_dir }}/root-ca.pem"
-    dashboard_config: "{{ lab_dashboards_conf_dir }}/opensearch_dashboards.yml"
+    lab_dashboards_tls_dashboard_key: "{{ lab_dashboards_conf_dir }}/dashboards-server.key"
+    lab_dashboards_tls_dashboard_csr: "{{ lab_dashboards_conf_dir }}/dashboards-server.csr"
+    lab_dashboards_tls_dashboard_cert: "{{ lab_dashboards_conf_dir }}/dashboards-server.pem"
+    lab_dashboards_tls_dashboard_ca: "{{ lab_dashboards_conf_dir }}/root-ca.pem"
+    lab_dashboards_tls_dashboard_config: "{{ lab_dashboards_conf_dir }}/opensearch_dashboards.yml"
 
 - name: Copy upstream-generated trusted CA certificate for OpenSearch HTTPS
   ansible.builtin.copy:
     src: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
-    dest: "{{ dashboard_ca }}"
+    dest: "{{ lab_dashboards_tls_dashboard_ca }}"
     remote_src: true
-    owner: '{{ os_dashboards_user }}'
-    group: '{{ os_dashboards_user }}'
-    mode: '0644'
-  register: dashboard_ca_changed
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0644"
+  register: lab_dashboards_tls_dashboard_ca_changed
+  notify: Restart dashboards after configuration changes
 
 - name: Save OpenSSL SAN specification for Dashboards browser certificate
   ansible.builtin.copy:
@@ -24,22 +26,22 @@
       keyUsage=digitalSignature,keyEncipherment
       extendedKeyUsage=serverAuth
       subjectAltName=IP:{{ ip }},IP:127.0.0.1,DNS:{{ inventory_hostname }},DNS:{{ inventory_hostname }}.{{ domain_name }},DNS:localhost
-    owner: '{{ os_dashboards_user }}'
-    group: '{{ os_dashboards_user }}'
-    mode: '0644'
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0644"
 
 - name: Generate private key for the Dashboards HTTPS endpoint
   ansible.builtin.command:
-    argv: [openssl, genrsa, -out, '{{ dashboard_key }}', '2048']
-    creates: '{{ dashboard_key }}'
+    argv: [openssl, genrsa, -out, "{{ lab_dashboards_tls_dashboard_key }}", "2048"]
+    creates: "{{ lab_dashboards_tls_dashboard_key }}"
   no_log: true
 
 - name: Restrict private-key access
   ansible.builtin.file:
-    path: '{{ dashboard_key }}'
-    owner: '{{ os_dashboards_user }}'
-    group: '{{ os_dashboards_user }}'
-    mode: '0600'
+    path: "{{ lab_dashboards_tls_dashboard_key }}"
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0600"
 
 - name: Create signing request for Dashboards HTTPS endpoint
   ansible.builtin.command:
@@ -48,12 +50,12 @@
       - req
       - -new
       - -key
-      - '{{ dashboard_key }}'
+      - "{{ lab_dashboards_tls_dashboard_key }}"
       - -out
-      - '{{ dashboard_csr }}'
+      - "{{ lab_dashboards_tls_dashboard_csr }}"
       - -subj
-      - '/CN={{ inventory_hostname }}.{{ domain_name }}'
-    creates: '{{ dashboard_csr }}'
+      - /CN={{ inventory_hostname }}.{{ domain_name }}
+    creates: "{{ lab_dashboards_tls_dashboard_csr }}"
 
 - name: Sign the Dashboards certificate with the upstream-generated lab CA
   ansible.builtin.command:
@@ -62,70 +64,71 @@
       - x509
       - -req
       - -in
-      - '{{ dashboard_csr }}'
+      - "{{ lab_dashboards_tls_dashboard_csr }}"
       - -CA
-      - '{{ lab_opensearch_conf_dir }}/root-ca.pem'
+      - "{{ lab_opensearch_conf_dir }}/root-ca.pem"
       - -CAkey
-      - '{{ lab_opensearch_conf_dir }}/root-ca.key'
+      - "{{ lab_opensearch_conf_dir }}/root-ca.key"
       - -CAcreateserial
       - -out
-      - '{{ dashboard_cert }}'
+      - "{{ lab_dashboards_tls_dashboard_cert }}"
       - -days
-      - '365'
+      - "365"
       - -sha256
       - -extfile
-      - '{{ lab_dashboards_conf_dir }}/dashboards-san.ext'
-    creates: '{{ dashboard_cert }}'
+      - "{{ lab_dashboards_conf_dir }}/dashboards-san.ext"
+    creates: "{{ lab_dashboards_tls_dashboard_cert }}"
   no_log: true
-  register: dashboard_signed
+  register: lab_dashboards_tls_dashboard_signed
+  notify: Restart dashboards after configuration changes
 
 - name: Set Dashboards HTTPS certificate permissions
   ansible.builtin.file:
-    path: '{{ dashboard_cert }}'
-    owner: '{{ os_dashboards_user }}'
-    group: '{{ os_dashboards_user }}'
-    mode: '0644'
+    path: "{{ lab_dashboards_tls_dashboard_cert }}"
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0644"
 
 - name: Enable server-side HTTPS in Dashboards
   ansible.builtin.blockinfile:
-    path: '{{ dashboard_config }}'
-    marker: '# {mark} LAB HTTPS SETTINGS'
+    path: "{{ lab_dashboards_tls_dashboard_config }}"
+    marker: "# {mark} LAB HTTPS SETTINGS"
     block: |
       server.ssl.enabled: true
-      server.ssl.certificate: {{ dashboard_cert }}
-      server.ssl.key: {{ dashboard_key }}
-      opensearch.ssl.certificateAuthorities: ["{{ dashboard_ca }}"]
-  register: dashboard_https_settings
+      server.ssl.certificate: {{ lab_dashboards_tls_dashboard_cert }}
+      server.ssl.key: {{ lab_dashboards_tls_dashboard_key }}
+      opensearch.ssl.certificateAuthorities: ["{{ lab_dashboards_tls_dashboard_ca }}"]
+  register: lab_dashboards_tls_dashboard_https_settings
+  notify: Restart dashboards after configuration changes
 
 - name: Verify upstream OpenSearch backend certificate using its CA and host/IP
   ansible.builtin.lineinfile:
-    path: '{{ dashboard_config }}'
-    regexp: '^opensearch\.ssl\.verificationMode:'
-    line: 'opensearch.ssl.verificationMode: full'
-  register: dashboard_verify_setting
+    path: "{{ lab_dashboards_tls_dashboard_config }}"
+    regexp: "^opensearch\\.ssl\\.verificationMode:"
+    line: "opensearch.ssl.verificationMode: full"
+  register: lab_dashboards_tls_dashboard_verify_setting
+  notify: Restart dashboards after configuration changes
 
 - name: Secure authentication cookies now that server HTTPS is enabled
   ansible.builtin.lineinfile:
-    path: '{{ dashboard_config }}'
-    regexp: '^opensearch_security\.cookie\.secure:'
-    line: 'opensearch_security.cookie.secure: true'
-  register: dashboard_cookie_setting
+    path: "{{ lab_dashboards_tls_dashboard_config }}"
+    regexp: "^opensearch_security\\.cookie\\.secure:"
+    line: "opensearch_security.cookie.secure: true"
+  register: lab_dashboards_tls_dashboard_cookie_setting
+  notify: Restart dashboards after configuration changes
 
-- name: Restart Dashboards after TLS or certificate updates
-  ansible.builtin.systemd:
-    name: dashboards
-    state: restarted
-  when: dashboard_ca_changed.changed or dashboard_signed.changed or dashboard_https_settings.changed or dashboard_verify_setting.changed or dashboard_cookie_setting.changed
+- name: Apply pending dashboards restart
+  ansible.builtin.meta: flush_handlers
 
 - name: Confirm Dashboards HTTPS listener is reachable from the VM
   ansible.builtin.wait_for:
-    host: '{{ ip }}'
+    host: "{{ ip }}"
     port: 5601
     delay: 4
     timeout: 180
 
 - name: Export the PUBLIC CA certificate to the Ansible controller for browser trust
   ansible.builtin.fetch:
-    src: '{{ dashboard_ca }}'
-    dest: '{{ playbook_dir }}/../files/root-ca.pem'
+    src: "{{ lab_dashboards_tls_dashboard_ca }}"
+    dest: "{{ playbook_dir }}/../files/root-ca.pem"
     flat: true
