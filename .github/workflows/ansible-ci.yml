@@ -13,6 +13,8 @@ jobs:
   ansible-check:
     name: Ansible lint and syntax check
     runs-on: ubuntu-latest
+    env:
+      ANSIBLE_CONFIG: ${{ github.workspace }}/ansible.cfg
 
     steps:
       - name: Checkout repository
@@ -34,18 +36,17 @@ jobs:
           ansible-lint --version
 
       - name: Install Ansible dependencies
-        run: |
-          if [ -f requirements.yml ]; then
-            ansible-galaxy install -r requirements.yml
-          fi
+        run: ansible-galaxy collection install -r requirements.yml
 
       - name: Run ansible-lint
         run: |
           ansible-lint .
+          # Explicit paths also cover versions that fail to expand the root directory.
+          ansible-lint lab1-mongodb/ lab2-opensearch/ requirements.yml
 
       - name: Run syntax checks
         run: |
-          for playbook in playbooks/*.yml; do
+          for playbook in lab1-mongodb/playbooks/*.yml lab2-opensearch/playbooks/*.yml lab2-opensearch/site.yml; do
             echo "Checking $playbook"
             ansible-playbook --syntax-check "$playbook"
           done
