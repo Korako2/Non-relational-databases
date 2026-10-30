@@ -1,0 +1,6 @@
+- import_playbook: playbooks/00-check-configuration.yml
+- import_playbook: playbooks/02-opensearch.yml
+- import_playbook: playbooks/03-dashboards.yml
+- import_playbook: playbooks/04-hot-warm.yml
+- import_playbook: playbooks/05-dashboards-tls.yml
+- import_playbook: playbooks/06-verify.yml
