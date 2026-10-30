@@ -1,3 +1,4 @@
+---
 - name: Add dedicated data tier attributes without replacing upstream OpenSearch config
   hosts: os-cluster
   become: true

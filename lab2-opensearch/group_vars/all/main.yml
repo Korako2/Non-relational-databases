@@ -1,9 +1,10 @@
+---
 ansible_python_interpreter: /usr/bin/python3
 
 os_cluster_name: opensearch-lab
 os_download_url: https://artifacts.opensearch.org/releases/bundle/opensearch
-os_version: '3.9.0'
-os_dashboards_version: '3.9.0'
+os_version: "3.9.0"
+os_dashboards_version: "3.9.0"
 domain_name: lab.internal
 cluster_type: multi-node
 os_user: opensearch

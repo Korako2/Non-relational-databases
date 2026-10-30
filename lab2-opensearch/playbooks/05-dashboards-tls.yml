@@ -1,3 +1,4 @@
+---
 - name: Enable browser HTTPS and upstream CA verification in Dashboards
   hosts: dashboards
   become: true
