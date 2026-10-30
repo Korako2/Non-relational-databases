@@ -1,0 +1,82 @@
+- name: Install Grafana repository dependencies
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - gnupg
+      - python3-debian
+    state: present
+
+- name: Add Grafana APT repository
+  ansible.builtin.deb822_repository:
+    name: grafana
+    types:
+      - deb
+    uris:
+      - https://apt.grafana.com
+    suites:
+      - stable
+    components:
+      - main
+    signed_by: https://apt.grafana.com/gpg-full.key
+    state: present
+
+- name: Install Grafana
+  ansible.builtin.apt:
+    name: grafana
+    state: present
+    update_cache: true
+
+- name: Bind Grafana to localhost
+  ansible.builtin.lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: '^;?http_addr\s*='
+    line: 'http_addr = 127.0.0.1'
+  notify: Restart Grafana
+
+- name: Set Grafana port
+  ansible.builtin.lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: '^;?http_port\s*='
+    line: 'http_port = {{ grafana_port }}'
+  notify: Restart Grafana
+
+- name: Provision Prometheus datasource
+  ansible.builtin.copy:
+    src: grafana-datasource.yml
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: root
+    group: grafana
+    mode: "0644"
+  notify: Restart Grafana
+
+- name: Create Grafana dashboards directory
+  ansible.builtin.file:
+    path: /var/lib/grafana/dashboards
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: "0755"
+
+- name: Provision Grafana dashboard provider
+  ansible.builtin.copy:
+    src: grafana-dashboard-provider.yml
+    dest: /etc/grafana/provisioning/dashboards/mongodb.yml
+    owner: root
+    group: grafana
+    mode: "0644"
+  notify: Restart Grafana
+
+- name: Install MongoDB Grafana dashboard
+  ansible.builtin.copy:
+    src: mongodb-lab-dashboard.json
+    dest: /var/lib/grafana/dashboards/mongodb-lab.json
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: Restart Grafana
+
+- name: Enable and start Grafana
+  ansible.builtin.systemd_service:
+    name: grafana-server
+    enabled: true
+    state: started

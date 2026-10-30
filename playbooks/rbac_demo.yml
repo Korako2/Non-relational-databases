@@ -1,0 +1,226 @@
+- name: Demonstrate MongoDB RBAC lifecycle
+  hosts: mongodb
+  become: true
+  gather_facts: true
+  vars:
+    rbac_demo_roles:
+      - name: educationReader
+        database: "{{ mongodb_university_db }}"
+        privileges:
+          - resource:
+              db: "{{ mongodb_university_db }}"
+              collection: ""
+            actions:
+              - find
+
+      - name: educationEditor
+        database: "{{ mongodb_university_db }}"
+        privileges:
+          - resource:
+              db: "{{ mongodb_university_db }}"
+              collection: ""
+            actions:
+              - find
+              - insert
+
+      - name: reportsReader
+        database: "{{ mongodb_reports_db }}"
+        privileges:
+          - resource:
+              db: "{{ mongodb_reports_db }}"
+              collection: ""
+            actions:
+              - find
+
+      - name: studentsReader
+        database: "{{ mongodb_university_db }}"
+        privileges:
+          - resource:
+              db: "{{ mongodb_university_db }}"
+              collection: "students"
+            actions:
+              - find
+
+    rbac_demo_users:
+      - name: reader_user
+        password: "{{ vault_reader_password }}"
+        roles:
+          - db: "{{ mongodb_university_db }}"
+            role: educationReader
+
+      - name: editor_user
+        password: "{{ vault_editor_password }}"
+        roles:
+          - db: "{{ mongodb_university_db }}"
+            role: educationEditor
+
+      - name: students_user
+        password: "{{ vault_students_password }}"
+        roles:
+          - db: "{{ mongodb_university_db }}"
+            role: studentsReader
+
+
+  pre_tasks:
+    - name: Check MongoDB port
+      ansible.builtin.wait_for:
+        host: "127.0.0.1"
+        port: "{{ mongodb_port }}"
+        timeout: 5
+
+    - name: Check authenticated MongoDB access
+      community.mongodb.mongodb_shell:
+        login_host: "127.0.0.1"
+        login_port: "{{ mongodb_port }}"
+        login_database: admin
+        login_user: "{{ mongodb_admin_user }}"
+        login_password: "{{ vault_mongodb_admin_password }}"
+        db: admin
+        eval: "db.runCommand({ ping: 1 })"
+      changed_when: false
+      no_log: true
+
+  tasks:
+    - name: Create demonstration MongoDB roles
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: create_role
+      vars:
+        mongodb_rbac_role_name: "{{ rbac_role_item.name }}"
+        mongodb_rbac_role_database: "{{ rbac_role_item.database }}"
+        mongodb_rbac_role_privileges: "{{ rbac_role_item.privileges }}"
+      loop: "{{ rbac_demo_roles }}"
+      loop_control:
+        loop_var: rbac_role_item
+        label: "{{ rbac_role_item.name }}"
+
+    - name: Create demonstration MongoDB users
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: create_user
+      vars:
+        mongodb_rbac_user_name: "{{ rbac_user_item.name }}"
+        mongodb_rbac_user_password: "{{ rbac_user_item.password }}"
+        mongodb_rbac_user_roles: "{{ rbac_user_item.roles }}"
+      loop: "{{ rbac_demo_users }}"
+      loop_control:
+        loop_var: rbac_user_item
+        label: "{{ rbac_user_item.name }}"
+
+    - name: Prepare demonstration collections
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: prepare_demo_data
+
+    - name: Check that students_user can read students
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: check_read_access
+      vars:
+        mongodb_rbac_check_user: students_user
+        mongodb_rbac_check_password: "{{ vault_students_password }}"
+
+        mongodb_rbac_check_database: "{{ mongodb_university_db }}"
+        mongodb_rbac_check_collection: students
+
+        mongodb_rbac_expect_access: true
+
+    - name: Check that students_user cannot read teachers
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: check_read_access
+      vars:
+        mongodb_rbac_check_user: students_user
+        mongodb_rbac_check_password: "{{ vault_students_password }}"
+
+        mongodb_rbac_check_database: "{{ mongodb_university_db }}"
+        mongodb_rbac_check_collection: teachers
+
+        mongodb_rbac_expect_access: false
+
+    - name: Grant reportsReader to reader_user
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: set_user_roles
+      vars:
+        mongodb_rbac_user_name: reader_user
+        mongodb_rbac_user_password: "{{ vault_reader_password }}"
+
+        mongodb_rbac_user_roles:
+          - db: "{{ mongodb_university_db }}"
+            role: educationReader
+
+          - db: "{{ mongodb_reports_db }}"
+            role: reportsReader
+
+    - name: Verify reader_user can read reports after grant
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: check_read_access
+      vars:
+        mongodb_rbac_check_user: reader_user
+        mongodb_rbac_check_password: "{{ vault_reader_password }}"
+
+        mongodb_rbac_check_database: "{{ mongodb_reports_db }}"
+        mongodb_rbac_check_collection: monthly_reports
+
+        mongodb_rbac_expect_access: true
+
+    - name: Extend educationEditor permissions
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: modify_role
+      vars:
+        mongodb_rbac_role_name: educationEditor
+        mongodb_rbac_role_database: "{{ mongodb_university_db }}"
+
+        mongodb_rbac_role_privileges:
+          - resource:
+              db: "{{ mongodb_university_db }}"
+              collection: ""
+            actions:
+              - find
+              - insert
+              - update
+              - remove
+
+    - name: Revoke reportsReader from reader_user
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: set_user_roles
+      vars:
+        mongodb_rbac_user_name: reader_user
+        mongodb_rbac_user_password: "{{ vault_reader_password }}"
+
+        mongodb_rbac_user_roles:
+          - db: "{{ mongodb_university_db }}"
+            role: educationReader
+
+    - name: Verify reader_user cannot read reports after revoke
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: check_read_access
+      vars:
+        mongodb_rbac_check_user: reader_user
+        mongodb_rbac_check_password: "{{ vault_reader_password }}"
+
+        mongodb_rbac_check_database: "{{ mongodb_reports_db }}"
+        mongodb_rbac_check_collection: monthly_reports
+
+        mongodb_rbac_expect_access: false
+
+    - name: Delete editor_user
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: delete_user
+      vars:
+        mongodb_rbac_user_name: editor_user
+        mongodb_rbac_user_database: admin
+
+    - name: Delete educationEditor role
+      ansible.builtin.include_role:
+        name: mongodb_rbac
+        tasks_from: delete_role
+      vars:
+        mongodb_rbac_role_name: educationEditor
+        mongodb_rbac_role_database: "{{ mongodb_university_db }}"

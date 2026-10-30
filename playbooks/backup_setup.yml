@@ -1,0 +1,6 @@
+- name: Configure MongoDB backup environment
+  hosts: mongodb
+  become: true
+  gather_facts: false
+  roles:
+    - mongodb_backup
