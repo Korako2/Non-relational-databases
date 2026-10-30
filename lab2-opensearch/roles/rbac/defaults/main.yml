@@ -1,0 +1,45 @@
+---
+rbac_api_url: "https://{{ ip }}:9200"
+rbac_cert_dir: "{{ lab_opensearch_conf_dir }}"
+
+rbac_roles:
+  - name: logs_writer
+    description: "Write new documents only to the logs data stream"
+    cluster_permissions:
+      - "indices:data/write/bulk"
+    index_permissions:
+      - index_patterns:
+          - "logs"
+        allowed_actions:
+          - "indices:data/write/index"
+          - "indices:data/write/bulk*"
+
+  - name: logs_reader
+    description: "Read documents from the logs data stream"
+    cluster_permissions: []
+    index_permissions:
+      - index_patterns:
+          - "logs"
+        allowed_actions:
+          - "read"
+
+  - name: cluster_monitor
+    description: "Minimal access to cluster and node metrics"
+    cluster_permissions:
+      - "cluster:monitor/health"
+      - "cluster:monitor/stats"
+      - "cluster:monitor/nodes/stats"
+    index_permissions: []
+
+rbac_users:
+  - name: logs_writer_user
+    role: logs_writer
+    password: "{{ rbac_writer_password }}"
+
+  - name: logs_reader_user
+    role: logs_reader
+    password: "{{ rbac_reader_password }}"
+
+  - name: monitor_user
+    role: cluster_monitor
+    password: "{{ rbac_monitor_password }}"

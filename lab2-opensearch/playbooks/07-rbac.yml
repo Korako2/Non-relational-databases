@@ -1,0 +1,7 @@
+---
+- name: Configure OpenSearch RBAC
+  hosts: os-manager
+  become: true
+  gather_facts: false
+  roles:
+    - rbac
