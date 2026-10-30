@@ -1,0 +1,85 @@
+import argparse
+import os
+import random
+import time
+
+from concurrent.futures import ThreadPoolExecutor
+from pymongo import MongoClient
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--duration", type=int, default=180)
+parser.add_argument("--workers", type=int, default=4)
+args = parser.parse_args()
+
+password = os.environ["MONGO_LOAD_PASSWORD"]
+
+def worker(worker_id: int):
+    client = MongoClient(
+        host="127.0.0.1",
+        port={{ mongodb_port }},
+        username="{{ mongodb_load_user }}",
+        password=password,
+        authSource="admin",
+    )
+
+    db = client["{{ mongodb_university_db }}"]
+    collection = db["load_test"]
+    finish_at = time.time() + args.duration
+    iteration = 0
+    while time.time() < finish_at:
+        iteration += 1
+        documents = [
+            {
+                "worker": worker_id,
+                "iteration": iteration,
+                "value": random.randint(1, 100000),
+                "payload": "x" * 2048,
+            }
+            for _ in range(20)
+        ]
+        result = collection.insert_many(documents)
+        inserted_ids = result.inserted_ids
+        for _ in range(10):
+            collection.find_one(
+                {
+                    "worker": worker_id,
+                    "iteration": iteration,
+                }
+            )
+        collection.update_many(
+            {
+                "_id": {
+                    "$in": inserted_ids[:10]
+                }
+            },
+            {
+                "$inc": {
+                    "value": 1
+                }
+            }
+        )
+        collection.delete_many(
+            {
+                "_id": {
+                    "$in": inserted_ids
+                }
+            }
+        )
+        time.sleep(0.05)
+    client.close()
+
+with ThreadPoolExecutor(max_workers=args.workers) as executor:
+    futures = [
+        executor.submit(worker, worker_id)
+        for worker_id in range(args.workers)
+    ]
+    for future in futures:
+        future.result()
+
+
+print(
+    f"Load test finished: "
+    f"{args.workers} workers, "
+    f"{args.duration} seconds"
+)

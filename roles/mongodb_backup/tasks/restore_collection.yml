@@ -1,0 +1,20 @@
+- name: Restore MongoDB collection
+  ansible.builtin.command:
+    argv:
+      - mongorestore
+      - --host
+      - "127.0.0.1"
+      - --port
+      - "{{ mongodb_port | string }}"
+      - --username
+      - "{{ mongodb_backup_user }}"
+      - --authenticationDatabase
+      - admin
+      - --config
+      - "{{ mongodb_tools_config }}"
+      - "--archive={{ restore_archive }}"
+      - --gzip
+      - "--nsInclude={{ restore_database }}.{{ restore_collection }}"
+      - --drop
+      - --stopOnError
+  changed_when: true

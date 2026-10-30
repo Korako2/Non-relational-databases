@@ -1,0 +1,26 @@
+[Unit]
+Description=MongoDB Exporter Service
+After=network.target mongod.service
+Requires=mongod.service
+
+[Service]
+Type=simple
+
+EnvironmentFile=/etc/default/mongodb_exporter
+
+ExecStart=/usr/bin/mongodb_exporter --mongodb.uri={{ mongodb_monitoring_uri }} \
+    --web.listen-address={{ mongodb_monitoring_exporter_listen_address }} \
+    --compatible-mode \
+    --collector.diagnosticdata \
+    --collector.dbstats \
+    --collector.topmetrics \
+    --collector.currentopmetrics
+
+Restart=on-failure
+RestartSec=5s
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
