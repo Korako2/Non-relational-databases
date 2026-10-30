@@ -1,0 +1,6 @@
+- name: Verify OpenSearch cluster and TLS configuration
+  hosts: os-manager
+  become: true
+  gather_facts: false
+  roles:
+    - lab_verify

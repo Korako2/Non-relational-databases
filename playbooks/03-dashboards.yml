@@ -1,0 +1,17 @@
+- name: Install OpenSearch Dashboards using upstream installation role
+  hosts: dashboards
+  gather_facts: true
+  become: true
+  vars:
+    populate_inventory_to_hosts_file: false
+  pre_tasks:
+    - name: Detect existing upstream Dashboards configuration
+      ansible.builtin.stat:
+        path: /usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
+      register: existing_dashboards
+    - name: Avoid overwriting the browser HTTPS configuration during reinstallation
+      ansible.builtin.assert:
+        that: not existing_dashboards.stat.exists
+        fail_msg: 'Dashboards is already configured. Do not rerun 03-dashboards; use 05-dashboards-tls instead.'
+  roles:
+    - linux/dashboards
