@@ -1,0 +1,71 @@
+---
+- name: Install Fluent Bit prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - python3-apt
+    state: present
+    update_cache: true
+
+- name: Download Fluent Bit repository signing key
+  ansible.builtin.get_url:
+    url: https://packages.fluentbit.io/fluentbit.key
+    dest: /usr/share/keyrings/fluentbit.asc
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Add official Fluent Bit APT repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/fluentbit.asc]
+      https://packages.fluentbit.io/ubuntu/jammy jammy main
+    filename: fluent-bit
+    state: present
+    update_cache: true
+
+- name: Install Fluent Bit
+  ansible.builtin.apt:
+    name: fluent-bit
+    state: present
+
+- name: Create Fluent Bit state directory
+  ansible.builtin.file:
+    path: /var/lib/fluent-bit
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create JSON parser configuration
+  ansible.builtin.copy:
+    dest: /etc/fluent-bit/parsers_lab.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [PARSER]
+          Name    nginx_json
+          Format  json
+  notify: Restart fluent-bit
+
+- name: Configure Fluent Bit for Nginx and OpenSearch
+  ansible.builtin.template:
+    src: fluent-bit.conf.j2
+    dest: /etc/fluent-bit/fluent-bit.conf
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart fluent-bit
+
+- name: Enable and start Fluent Bit
+  ansible.builtin.systemd_service:
+    name: fluent-bit
+    enabled: true
+    state: started
+
+- name: Apply Fluent Bit configuration
+  ansible.builtin.meta: flush_handlers

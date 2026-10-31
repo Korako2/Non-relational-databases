@@ -1,0 +1,24 @@
+---
+- name: Configure OpenSearch logs data stream and ISM
+  hosts: os-manager
+  become: true
+  gather_facts: false
+
+  roles:
+    - lab_logs_ism
+
+- name: Deploy Nginx with JSON logging
+  hosts: os-hot
+  become: true
+  gather_facts: false
+
+  roles:
+    - lab_nginx_json
+
+- name: Deploy Fluent Bit log collector
+  hosts: os-hot
+  become: true
+  gather_facts: false
+
+  roles:
+    - lab_fluentbit
