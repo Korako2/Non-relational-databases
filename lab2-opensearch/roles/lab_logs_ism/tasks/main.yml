@@ -8,21 +8,23 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     status_code: [200, 404]
-  register: logs_existing_policy
+  register: lab_logs_ism_existing_policy
 
 - name: Set policy URL
   ansible.builtin.set_fact:
-    policy_url: "https://{{ ip }}:9200/_plugins/_ism/policies/logs-retention-10m"
+    lab_logs_ism_policy_url: "https://{{ ip }}:9200/_plugins/_ism/policies/logs-retention-10m"
 
 - name: Add version parameters if policy exists
   ansible.builtin.set_fact:
-    policy_url: "{{ policy_url }}?if_seq_no={{ logs_existing_policy.json._seq_no }}&if_primary_term={{ logs_existing_policy.json._primary_term }}"
-  when: logs_existing_policy.status == 200
+    lab_logs_ism_policy_url: >-
+      {{ lab_logs_ism_policy_url }}?if_seq_no={{ lab_logs_ism_existing_policy.json._seq_no
+      }}&if_primary_term={{ lab_logs_ism_existing_policy.json._primary_term }}
+  when: lab_logs_ism_existing_policy.status == 200
 
 
 - name: Create or update logs ISM policy
   ansible.builtin.uri:
-    url: "{{ policy_url }}"
+    url: "{{ lab_logs_ism_policy_url }}"
     method: PUT
     client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
     client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
@@ -116,7 +118,7 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     status_code: [200, 404]
-  register: logs_stream_check
+  register: lab_logs_ism_stream_check
 
 - name: Create logs data stream
   ansible.builtin.uri:
@@ -127,7 +129,7 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     status_code: [200, 201]
-  when: logs_stream_check.status == 404
+  when: lab_logs_ism_stream_check.status == 404
 
 - name: Get data stream backing indexes
   ansible.builtin.uri:
@@ -138,7 +140,7 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     status_code: 200
-  register: logs_stream_info
+  register: lab_logs_ism_stream_info
 
 - name: Inspect ISM policy on backing indexes
   ansible.builtin.uri:
@@ -149,21 +151,21 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     status_code: 200
-  loop: "{{ logs_stream_info.json.data_streams[0].indices }}"
+  loop: "{{ lab_logs_ism_stream_info.json.data_streams[0].indices }}"
   loop_control:
     label: "{{ item.index_name }}"
-  register: logs_backing_explain
+  register: lab_logs_ism_backing_explain
 
 - name: Refuse to replace another ISM policy
   ansible.builtin.assert:
     that:
-      - current_policy in ['', 'logs-retention-10m']
+      - lab_logs_ism_current_policy in ['', 'logs-retention-10m']
     fail_msg: "Backing index already uses another ISM policy"
   vars:
-    current_policy: >-
+    lab_logs_ism_current_policy: >-
       {{ item.json.get(item.item.index_name, {}).get('policy_id')
          | default('', true) }}
-  loop: "{{ logs_backing_explain.results }}"
+  loop: "{{ lab_logs_ism_backing_explain.results }}"
   loop_control:
     label: "{{ item.item.index_name }}"
 
@@ -182,7 +184,7 @@
   when: >-
     not (item.json.get(item.item.index_name, {}).get('policy_id')
          | default('', true))
-  loop: "{{ logs_backing_explain.results }}"
+  loop: "{{ lab_logs_ism_backing_explain.results }}"
   loop_control:
     label: "{{ item.item.index_name }}"
 

@@ -103,9 +103,9 @@
 - name: Check JSON access log exists
   ansible.builtin.stat:
     path: /var/log/nginx/opensearch-access.json
-  register: nginx_json_log
+  register: lab_nginx_json_log
 
 - name: Assert JSON log was created
   ansible.builtin.assert:
     that:
-      - nginx_json_log.stat.exists
+      - lab_nginx_json_log.stat.exists
