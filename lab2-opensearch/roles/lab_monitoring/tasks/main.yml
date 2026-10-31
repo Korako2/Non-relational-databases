@@ -98,7 +98,12 @@
     content: |
       [Service]
       ExecStart=
-      ExecStart=/usr/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/lab --storage.tsdb.retention.time=24h --storage.tsdb.retention.size=300MB --web.listen-address=127.0.0.1:9090
+      ExecStart=/usr/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus/lab \
+        --storage.tsdb.retention.time=24h \
+        --storage.tsdb.retention.size=300MB \
+        --web.listen-address=127.0.0.1:9090
   notify: Restart prometheus
 
 - name: Validate Prometheus configuration

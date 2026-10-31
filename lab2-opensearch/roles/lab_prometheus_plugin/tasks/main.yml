@@ -2,7 +2,7 @@
 - name: Check installed OpenSearch plugins
   ansible.builtin.command:
     cmd: /usr/share/opensearch/bin/opensearch-plugin list
-  register: lab_prom_plugins
+  register: lab_prometheus_plugin_installed_plugins
   changed_when: false
 
 - name: Download Prometheus Exporter Plugin 3.9.0.0
@@ -12,14 +12,15 @@
     dest: /var/tmp/prometheus-exporter-3.9.0.0.zip
     mode: "0644"
     timeout: 120
-  when: "'prometheus-exporter' not in lab_prom_plugins.stdout"
+  when: "'prometheus-exporter' not in lab_prometheus_plugin_installed_plugins.stdout"
 
 - name: Install Prometheus Exporter Plugin
   ansible.builtin.command:
     cmd: >-
       /usr/share/opensearch/bin/opensearch-plugin install --batch
       file:///var/tmp/prometheus-exporter-3.9.0.0.zip
-  when: "'prometheus-exporter' not in lab_prom_plugins.stdout"
+  when: "'prometheus-exporter' not in lab_prometheus_plugin_installed_plugins.stdout"
+  changed_when: true
   notify: Restart OpenSearch for exporter
 
 - name: Configure exporter to collect metrics from all cluster nodes
@@ -45,10 +46,10 @@
     validate_certs: true
     status_code: 200
     return_content: true
-  register: lab_prom_exporter_response
+  register: lab_prometheus_plugin_exporter_response
 
 - name: Assert Prometheus metrics are present
   ansible.builtin.assert:
     that:
-      - "'opensearch_' in lab_prom_exporter_response.content"
+      - "'opensearch_' in lab_prometheus_plugin_exporter_response.content"
     fail_msg: "Prometheus Exporter returned no OpenSearch metrics"
