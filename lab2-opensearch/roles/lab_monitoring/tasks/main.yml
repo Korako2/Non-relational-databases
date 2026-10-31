@@ -1,0 +1,244 @@
+---
+- name: Check available memory on os-warm
+  ansible.builtin.shell: |
+    awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo
+  register: lab_monitoring_memory
+  changed_when: false
+
+- name: Require enough available memory
+  ansible.builtin.assert:
+    that:
+      - lab_monitoring_memory.stdout | int >= 1200
+    fail_msg: >-
+      Not enough available memory for Prometheus and Grafana.
+      Available: {{ lab_monitoring_memory.stdout }} MB.
+      Use another monitoring host.
+    success_msg: >-
+      Available memory: {{ lab_monitoring_memory.stdout }} MB
+
+- name: Install monitoring prerequisites and Prometheus
+  ansible.builtin.apt:
+    name:
+      - prometheus
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Create Prometheus lab storage directory
+  ansible.builtin.file:
+    path: /var/lib/prometheus/lab
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: "0750"
+
+- name: Copy OpenSearch root CA for Prometheus
+  ansible.builtin.copy:
+    src: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    dest: /etc/prometheus/opensearch-root-ca.pem
+    remote_src: true
+    owner: root
+    group: prometheus
+    mode: "0640"
+  notify: Restart prometheus
+
+- name: Store monitoring user password securely
+  ansible.builtin.copy:
+    content: "{{ rbac_monitor_password }}"
+    dest: /etc/prometheus/opensearch-monitor.password
+    owner: root
+    group: prometheus
+    mode: "0640"
+  no_log: true
+  notify: Restart prometheus
+
+- name: Check monitoring user access to exporter
+  ansible.builtin.uri:
+    url: "https://os-hot.lab.internal:9200/_prometheus/metrics"
+    method: GET
+    user: monitor_user
+    password: "{{ rbac_monitor_password }}"
+    force_basic_auth: true
+    ca_path: /etc/prometheus/opensearch-root-ca.pem
+    validate_certs: true
+    status_code: [200, 401, 403]
+  register: lab_monitoring_exporter_access
+  no_log: true
+
+- name: Require monitoring user access to exporter
+  ansible.builtin.assert:
+    that:
+      - lab_monitoring_exporter_access.status == 200
+    fail_msg: >-
+      monitor_user cannot access Prometheus Exporter
+      (HTTP {{ lab_monitoring_exporter_access.status }}).
+      Check the cluster_monitor role permissions.
+
+- name: Configure Prometheus
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: root
+    group: prometheus
+    mode: "0640"
+  notify: Restart prometheus
+
+- name: Configure Prometheus storage and local-only access
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus.service.d
+    state: directory
+    mode: "0755"
+
+- name: Create Prometheus systemd override
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus.service.d/lab.conf
+    mode: "0644"
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus/lab \
+        --storage.tsdb.retention.time=24h \
+        --storage.tsdb.retention.size=300MB \
+        --web.listen-address=127.0.0.1:9090
+  notify: Restart prometheus
+
+- name: Validate Prometheus configuration
+  ansible.builtin.command:
+    cmd: promtool check config /etc/prometheus/prometheus.yml
+  changed_when: false
+
+- name: Start Prometheus
+  ansible.builtin.systemd_service:
+    name: prometheus
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Apply Prometheus configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Ensure Grafana APT keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download Grafana package on Ansible controller
+  ansible.builtin.get_url:
+    url: https://dl.grafana.com/grafana/release/13.3.0/grafana_13.3.0_40412481033_linux_amd64.deb
+    dest: /tmp/grafana_13.3.0_amd64.deb
+    checksum: "sha256:458cb47824fda2c1e93c51e5d9c4893543f7fe24c58c2f5cb9c7a91d7360070f"
+    mode: "0644"
+    timeout: 120
+  delegate_to: localhost
+  become: false
+
+- name: Copy Grafana package to os-warm
+  ansible.builtin.copy:
+    src: /tmp/grafana_13.3.0_amd64.deb
+    dest: /var/tmp/grafana_13.3.0_amd64.deb
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install Grafana package dependencies
+  ansible.builtin.apt:
+    name:
+      - adduser
+      - libfontconfig1
+      - musl
+      - python3-debian
+    state: present
+    update_cache: true
+
+- name: Install Grafana OSS from local package
+  ansible.builtin.apt:
+    deb: /var/tmp/grafana_13.3.0_amd64.deb
+    state: present
+
+- name: Configure Grafana to listen only on localhost
+  ansible.builtin.file:
+    path: /etc/systemd/system/grafana-server.service.d
+    state: directory
+    mode: "0755"
+
+- name: Create Grafana systemd override
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/grafana-server.service.d/lab.conf
+    mode: "0644"
+    content: |
+      [Service]
+      Environment=GF_SERVER_HTTP_ADDR=127.0.0.1
+      Environment=GF_SERVER_HTTP_PORT=3000
+      Environment=GF_USERS_ALLOW_SIGN_UP=false
+  notify: Restart grafana-server
+
+- name: Provision Grafana Prometheus data source
+  ansible.builtin.copy:
+    dest: /etc/grafana/provisioning/datasources/opensearch-prometheus.yml
+    owner: root
+    group: grafana
+    mode: "0644"
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          uid: prometheus
+          type: prometheus
+          access: proxy
+          url: http://127.0.0.1:9090
+          isDefault: true
+          editable: false
+  notify: Restart grafana-server
+
+- name: Create Grafana dashboards directory
+  ansible.builtin.file:
+    path: /var/lib/grafana/dashboards
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: "0755"
+
+- name: Provision Grafana dashboard provider
+  ansible.builtin.copy:
+    dest: /etc/grafana/provisioning/dashboards/opensearch-lab.yml
+    owner: root
+    group: grafana
+    mode: "0644"
+    content: |
+      apiVersion: 1
+      providers:
+        - name: OpenSearch Lab
+          orgId: 1
+          folder: OpenSearch
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards
+  notify: Restart grafana-server
+
+- name: Install OpenSearch monitoring dashboard
+  ansible.builtin.copy:
+    src: opensearch-lab.json
+    dest: /var/lib/grafana/dashboards/opensearch-lab.json
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: Restart grafana-server
+
+- name: Start Grafana
+  ansible.builtin.systemd_service:
+    name: grafana-server
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Apply Grafana configuration
+  ansible.builtin.meta: flush_handlers

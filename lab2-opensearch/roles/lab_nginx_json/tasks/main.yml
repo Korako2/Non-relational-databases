@@ -1,0 +1,111 @@
+---
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Create lab website directory
+  ansible.builtin.file:
+    path: /var/www/opensearch-lab
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create lab HTML page
+  ansible.builtin.copy:
+    dest: /var/www/opensearch-lab/index.html
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      <!DOCTYPE html>
+      <html lang="ru">
+      <head>
+        <meta charset="UTF-8">
+        <title>OpenSearch Lab</title>
+      </head>
+      <body>
+        <h1>OpenSearch Logging Lab</h1>
+        <p>Nginx -> Fluent Bit -> OpenSearch</p>
+      </body>
+      </html>
+
+- name: Create Nginx configuration with JSON logging
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/opensearch-lab
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      log_format opensearch_json escape=json
+        '{'
+          '"@timestamp":"$time_iso8601",'
+          '"remote_addr":"$remote_addr",'
+          '"method":"$request_method",'
+          '"path":"$uri",'
+          '"request":"$request",'
+          '"status":$status,'
+          '"bytes_sent":$body_bytes_sent,'
+          '"request_time":$request_time,'
+          '"user_agent":"$http_user_agent"'
+        '}';
+
+      server {
+          listen 127.0.0.1:8080;
+          server_name _;
+
+          root /var/www/opensearch-lab;
+          index index.html;
+
+          access_log /var/log/nginx/opensearch-access.json opensearch_json;
+
+          location / {
+              try_files $uri $uri/ =404;
+          }
+      }
+  notify: Restart nginx
+
+- name: Disable default Nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Restart nginx
+
+- name: Enable lab Nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/opensearch-lab
+    dest: /etc/nginx/sites-enabled/opensearch-lab
+    state: link
+  notify: Restart nginx
+
+- name: Validate Nginx configuration
+  ansible.builtin.command:
+    cmd: nginx -t
+  changed_when: false
+
+- name: Enable and start Nginx
+  ansible.builtin.systemd_service:
+    name: nginx
+    enabled: true
+    state: started
+
+- name: Apply Nginx configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Check lab page
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8080/
+    method: GET
+    status_code: 200
+
+- name: Check JSON access log exists
+  ansible.builtin.stat:
+    path: /var/log/nginx/opensearch-access.json
+  register: lab_nginx_json_log
+
+- name: Assert JSON log was created
+  ansible.builtin.assert:
+    that:
+      - lab_nginx_json_log.stat.exists

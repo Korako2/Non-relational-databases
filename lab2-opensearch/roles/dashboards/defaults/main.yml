@@ -1,0 +1,22 @@
+---
+dashboards_os_nodes: |-
+  {% for item in groups['os-cluster'] -%}
+    {{ hostvars[item]['ip'] }}{% if not loop.last %}","{% endif %}
+  {%- endfor %}
+
+dashboards_populate_inventory_to_hosts_file: "{{ populate_inventory_to_hosts_file | default(true) }}"
+
+dashboards_os_dashboards_home: "{{ os_dashboards_home | default('/usr/share/opensearch-dashboards') }}"
+dashboards_os_conf_dir: "{{ os_conf_dir | default('/usr/share/opensearch-dashboards/config') }}"
+dashboards_os_plugin_bin_path: "{{ os_plugin_bin_path | default('/usr/share/opensearch-dashboards/bin/opensearch-dashboards-plugin') }}"
+
+dashboards_os_api_port: "{{ os_api_port | default(9200) }}"
+dashboards_os_nodes_dashboards: |-
+  {% for item in groups['os-cluster'] -%}
+    https://{{ hostvars[item]['ip'] }}:{{ dashboards_os_api_port }}{% if not loop.last %}","{% endif %}
+  {%- endfor %}
+
+dashboards_systemctl_path: "{{ systemctl_path | default('/etc/systemd/system') }}"
+
+# Auth type: 'internal' or 'oidc' (OpenID). Default: internal
+dashboards_auth_type: "{{ auth_type | default('internal') }}"

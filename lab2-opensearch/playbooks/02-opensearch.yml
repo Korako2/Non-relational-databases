@@ -1,0 +1,16 @@
+---
+- name: Install and initialize three-node OpenSearch using upstream installation role
+  hosts: os-cluster
+  gather_facts: true
+  become: true
+  pre_tasks:
+    - name: Detect prior upstream TLS bootstrap
+      ansible.builtin.stat:
+        path: /usr/share/opensearch/config/root-ca.pem
+      register: existing_upstream_ca
+    - name: Stop before destructive re-bootstrap
+      ansible.builtin.assert:
+        that: not existing_upstream_ca.stat.exists
+        fail_msg: "Upstream OpenSearch already initialized. Do NOT rerun 02-opensearch; use 04, 05, 06 for post-configuration."
+  roles:
+    - opensearch

@@ -1,0 +1,114 @@
+---
+- name: Verify OpenSearch Prometheus Exporter
+  hosts: os-hot
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check exporter endpoint
+      ansible.builtin.uri:
+        url: "https://{{ ip }}:9200/_prometheus/metrics"
+        method: GET
+        client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+        client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+        ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+        validate_certs: true
+        status_code: 200
+        return_content: true
+      register: monitoring_exporter
+
+    - name: Assert exporter returns cluster metrics
+      ansible.builtin.assert:
+        that:
+          - "'opensearch_cluster_status' in monitoring_exporter.content"
+          - "'opensearch_cluster_nodes_number' in monitoring_exporter.content"
+        fail_msg: "OpenSearch Prometheus metrics are missing"
+
+    - name: Show exporter verification
+      ansible.builtin.debug:
+        msg: "Prometheus Exporter is working on os-hot"
+
+- name: Verify Prometheus and Grafana
+  hosts: os-warm
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check Prometheus service
+      ansible.builtin.systemd_service:
+        name: prometheus
+      register: monitoring_prometheus_service
+
+    - name: Check Grafana service
+      ansible.builtin.systemd_service:
+        name: grafana-server
+      register: monitoring_grafana_service
+
+    - name: Assert monitoring services are running
+      ansible.builtin.assert:
+        that:
+          - monitoring_prometheus_service.status.ActiveState == 'active'
+          - monitoring_grafana_service.status.ActiveState == 'active'
+
+    - name: Check OpenSearch target in Prometheus
+      ansible.builtin.uri:
+        url: >-
+          http://127.0.0.1:9090/api/v1/query?query=up%7Bjob%3D%22opensearch%22%7D
+        method: GET
+        status_code: 200
+      register: monitoring_target
+      retries: 12
+      delay: 5
+      until: >-
+        monitoring_target.json.status == 'success' and
+        (monitoring_target.json.data.result | length > 0) and
+        (monitoring_target.json.data.result[0].value[1] | float == 1)
+
+    - name: Check cluster node count metric
+      ansible.builtin.uri:
+        url: >-
+          http://127.0.0.1:9090/api/v1/query?query=opensearch_cluster_nodes_number
+        method: GET
+        status_code: 200
+      register: monitoring_nodes
+
+    - name: Assert all three cluster nodes are reported
+      ansible.builtin.assert:
+        that:
+          - monitoring_nodes.json.status == 'success'
+          - monitoring_nodes.json.data.result | length > 0
+          - monitoring_nodes.json.data.result[0].value[1] | float == 3
+        fail_msg: "Expected metrics for the three-node OpenSearch cluster"
+
+    - name: Check Grafana HTTP API
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/health
+        method: GET
+        status_code: 200
+      register: monitoring_grafana_health
+
+    - name: Check dashboard JSON exists
+      ansible.builtin.stat:
+        path: /var/lib/grafana/dashboards/opensearch-lab.json
+      register: monitoring_dashboard
+
+    - name: Assert dashboard was deployed
+      ansible.builtin.assert:
+        that:
+          - monitoring_dashboard.stat.exists
+
+    - name: Check available memory after installation
+      ansible.builtin.command:
+        cmd: free -m
+      register: monitoring_memory
+      changed_when: false
+
+    - name: Show monitoring summary
+      ansible.builtin.debug:
+        msg:
+          prometheus: "running"
+          opensearch_target: "UP"
+          cluster_nodes: "{{ monitoring_nodes.json.data.result[0].value[1] }}"
+          grafana: "running"
+          dashboard: "OpenSearch Lab Monitoring"
+          memory: "{{ monitoring_memory.stdout_lines }}"
