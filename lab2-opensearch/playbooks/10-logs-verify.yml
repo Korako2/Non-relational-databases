@@ -1,0 +1,99 @@
+---
+- name: Generate and validate Nginx JSON logs
+  hosts: os-hot
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Generate Nginx HTTP requests
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:8080/?lab_test={{ item }}"
+        method: GET
+        status_code: 200
+      loop: "{{ range(1, 11) | list }}"
+
+    - name: Read last JSON log record
+      ansible.builtin.command:
+        cmd: tail -n 1 /var/log/nginx/opensearch-access.json
+      register: logs_last_nginx_record
+      changed_when: false
+
+    - name: Validate Nginx JSON log format
+      ansible.builtin.assert:
+        that:
+          - (logs_last_nginx_record.stdout | from_json).status == 200
+          - (logs_last_nginx_record.stdout | from_json).method == 'GET'
+          - (logs_last_nginx_record.stdout | from_json)['@timestamp'] is defined
+
+- name: Verify logs are indexed and managed
+  hosts: os-manager
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check data stream
+      ansible.builtin.uri:
+        url: "https://{{ ip }}:9200/_data_stream/logs"
+        method: GET
+        client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+        client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+        ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+        validate_certs: true
+        status_code: 200
+      register: logs_verify_stream
+
+    - name: Check indexed documents
+      ansible.builtin.uri:
+        url: "https://{{ ip }}:9200/logs/_count"
+        method: GET
+        client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+        client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+        ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+        validate_certs: true
+        status_code: 200
+      register: logs_verify_count
+      retries: 12
+      delay: 5
+      until: logs_verify_count.json.count | int > 0
+
+    - name: Check ISM policy
+      ansible.builtin.uri:
+        url: "https://{{ ip }}:9200/_plugins/_ism/policies/logs-retention-10m"
+        method: GET
+        client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+        client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+        ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+        validate_certs: true
+        status_code: 200
+      register: logs_verify_policy
+
+    - name: Assert rollover and retention settings
+      ansible.builtin.assert:
+        that:
+          - logs_verify_policy.json.policy.states[0].actions[0].rollover.min_primary_shard_size == '1mb'
+          - logs_verify_policy.json.policy.states[0].actions[0].rollover.min_index_age == '1m'
+          - logs_verify_policy.json.policy.states[1].transitions[0].conditions.min_index_age == '10m'
+
+    - name: Get ISM status for backing indexes
+      ansible.builtin.uri:
+        url: "https://{{ ip }}:9200/_plugins/_ism/explain/.ds-logs-*"
+        method: GET
+        client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+        client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+        ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+        validate_certs: true
+        status_code: 200
+      register: logs_verify_ism
+
+    - name: Show verification results
+      ansible.builtin.debug:
+        msg:
+          data_stream: "{{ logs_verify_stream.json.data_streams[0].name }}"
+          generation: "{{ logs_verify_stream.json.data_streams[0].generation }}"
+          indexed_documents: "{{ logs_verify_count.json.count }}"
+          ism_policy: logs-retention-10m
+          result: "Nginx -> Fluent Bit -> OpenSearch verified"
+
+    - name: Show ISM backing index states
+      ansible.builtin.debug:
+        var: logs_verify_ism.json
