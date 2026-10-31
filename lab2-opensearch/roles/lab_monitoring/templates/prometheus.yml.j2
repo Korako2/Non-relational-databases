@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - "127.0.0.1:9090"
+
+  - job_name: opensearch
+    metrics_path: /_prometheus/metrics
+    scheme: https
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+    basic_auth:
+      username: monitor_user
+      password_file: /etc/prometheus/opensearch-monitor.password
+
+    tls_config:
+      ca_file: /etc/prometheus/opensearch-root-ca.pem
+      server_name: os-hot.lab.internal
+
+    static_configs:
+      - targets:
+          - "{{ hostvars['os-hot'].ip }}:9200"
+        labels:
+          cluster_name: opensearch-lab
