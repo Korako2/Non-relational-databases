@@ -1,0 +1,7 @@
+---
+- name: Validate inventory and secrets before deployment
+  hosts: controller
+  gather_facts: false
+  become: false
+  roles:
+    - check_configuration

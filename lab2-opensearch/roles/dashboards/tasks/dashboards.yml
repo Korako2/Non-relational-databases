@@ -1,0 +1,63 @@
+---
+- name: Dashboards Install | Download opensearch dashbaord {{ os_dashboards_version }}
+  ansible.builtin.get_url:
+    url: "{{ os_download_url }}-dashboards/{{ os_dashboards_version }}/opensearch-dashboards-{{ os_dashboards_version }}-linux-x64.tar.gz"
+    dest: /tmp/opensearch-dashboards.tar.gz
+    mode: "0644"
+  register: dashboards_download
+
+- name: Dashboards Install | Create opensearch dashboard user
+  ansible.builtin.user:
+    name: "{{ os_dashboards_user }}"
+    state: present
+    shell: /bin/false
+    create_home: true
+    home: "{{ dashboards_os_dashboards_home }}"
+  when: dashboards_download.changed or iac_enable
+
+- name: Dashboards Install | Create home directory
+  ansible.builtin.file:
+    path: "{{ dashboards_os_dashboards_home }}"
+    state: directory
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0755"
+  when: dashboards_download.changed or iac_enable
+
+- name: Dashboards Install | Extract the tar file
+  when: dashboards_download.changed or iac_enable
+  ansible.builtin.unarchive:
+    src: /tmp/opensearch-dashboards.tar.gz
+    dest: "{{ dashboards_os_dashboards_home }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+
+- name: Dashboards Install | Copy Configuration File
+  ansible.builtin.template:
+    src: opensearch_dashboards.yml
+    dest: "{{ dashboards_os_conf_dir }}/opensearch_dashboards.yml"
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0644"
+    backup: true
+
+- name: Dashboards Install | Set the file ownerships
+  ansible.builtin.file:
+    dest: "{{ dashboards_os_dashboards_home }}"
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    recurse: true
+
+- name: Dashboards Install | Set the folder permission
+  ansible.builtin.file:
+    dest: "{{ dashboards_os_conf_dir }}"
+    owner: "{{ os_dashboards_user }}"
+    group: "{{ os_dashboards_user }}"
+    mode: "0700"
+
+- name: Dashboards Install | create systemd service
+  ansible.builtin.template:
+    src: dashboards.service
+    dest: "{{ dashboards_systemctl_path }}/dashboards.service"
+    mode: "0644"

@@ -1,0 +1,7 @@
+---
+- name: Enable browser HTTPS and upstream CA verification in Dashboards
+  hosts: dashboards
+  become: true
+  gather_facts: false
+  roles:
+    - lab_dashboards_tls

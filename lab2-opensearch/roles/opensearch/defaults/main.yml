@@ -1,0 +1,23 @@
+---
+opensearch_os_nodes: |-
+  {% for item in groups['os-cluster'] -%}
+    {{ item }}{% if not loop.last %}","{% endif %}
+  {%- endfor %}
+
+opensearch_os_master_nodes: |-
+  {% for item in groups['master'] -%}
+    {{ item }}{% if not loop.last %}","{% endif %}
+  {%- endfor %}
+
+opensearch_populate_inventory_to_hosts_file: "{{ populate_inventory_to_hosts_file | default(true) }}"
+
+opensearch_os_home: "{{ os_home | default('/usr/share/opensearch') }}"
+opensearch_os_conf_dir: "{{ os_conf_dir | default('/usr/share/opensearch/config') }}"
+opensearch_os_plugin_bin_path: "{{ os_plugin_bin_path | default('/usr/share/opensearch/bin/opensearch-plugin') }}"
+opensearch_os_sec_plugin_conf_path: "{{ os_sec_plugin_conf_path | default('/usr/share/opensearch/config/opensearch-security') }}"
+opensearch_os_sec_plugin_tools_path: "{{ os_sec_plugin_tools_path | default('/usr/share/opensearch/plugins/opensearch-security/tools') }}"
+opensearch_os_api_port: "{{ os_api_port | default(9200) }}"
+
+opensearch_systemctl_path: "{{ systemctl_path | default('/etc/systemd/system') }}"
+
+opensearch_auth_type: "{{ auth_type | default('internal') }}"

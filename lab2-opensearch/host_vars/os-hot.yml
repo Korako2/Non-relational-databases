@@ -1,0 +1,9 @@
+---
+ansible_user: "{{ lookup('ansible.builtin.env', 'VBOX_SSH_USER') | default('orako2', true) }}"
+ansible_host: "{{ lookup('ansible.builtin.env', 'OS_HOT_SSH_HOST') | default('192.168.0.111', true) }}"
+os_private_ip: "{{ lookup('ansible.builtin.env', 'OS_HOT_PRIVATE_IP') | default('192.168.0.111', true) }}"
+ip: "{{ os_private_ip }}"
+opensearch_node_roles: data,cluster_manager,ingest
+xms_value: 2
+xmx_value: 2
+os_tier: hot
