@@ -1,0 +1,13 @@
+---
+- name: Restart OpenSearch for exporter
+  ansible.builtin.systemd_service:
+    name: opensearch
+    state: restarted
+
+- name: Wait for OpenSearch HTTPS port
+  ansible.builtin.wait_for:
+    host: "{{ ip }}"
+    port: 9200
+    delay: 3
+    timeout: 180
+  listen: Restart OpenSearch for exporter

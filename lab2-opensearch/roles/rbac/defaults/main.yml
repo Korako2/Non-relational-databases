@@ -24,12 +24,19 @@ rbac_roles:
           - "read"
 
   - name: cluster_monitor
-    description: "Minimal access to cluster and node metrics"
+    description: "Read-only OpenSearch monitoring and Prometheus metrics"
     cluster_permissions:
+      - "cluster:monitor/prometheus/metrics"
       - "cluster:monitor/health"
       - "cluster:monitor/stats"
+      - "cluster:monitor/state"
+      - "cluster:monitor/nodes/info"
       - "cluster:monitor/nodes/stats"
-    index_permissions: []
+    index_permissions:
+      - index_patterns:
+          - "*"
+        allowed_actions:
+          - "indices:monitor/stats"
 
 rbac_users:
   - name: logs_writer_user

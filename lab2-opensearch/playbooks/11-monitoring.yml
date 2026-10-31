@@ -1,0 +1,16 @@
+---
+- name: Install Prometheus Exporter Plugin on os-hot
+  hosts: os-hot
+  become: true
+  gather_facts: false
+
+  roles:
+    - lab_prometheus_plugin
+
+- name: Install Prometheus and Grafana on os-warm
+  hosts: os-warm
+  become: true
+  gather_facts: false
+
+  roles:
+    - lab_monitoring
