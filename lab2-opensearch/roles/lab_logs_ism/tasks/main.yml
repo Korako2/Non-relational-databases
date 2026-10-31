@@ -1,0 +1,212 @@
+---
+- name: Get existing ISM policy
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_plugins/_ism/policies/logs-retention-10m"
+    method: GET
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: [200, 404]
+  register: logs_existing_policy
+
+- name: Set policy URL
+  ansible.builtin.set_fact:
+    policy_url: "https://{{ ip }}:9200/_plugins/_ism/policies/logs-retention-10m"
+
+- name: Add version parameters if policy exists
+  ansible.builtin.set_fact:
+    policy_url: "{{ policy_url }}?if_seq_no={{ logs_existing_policy.json._seq_no }}&if_primary_term={{ logs_existing_policy.json._primary_term }}"
+  when: logs_existing_policy.status == 200
+
+
+- name: Create or update logs ISM policy
+  ansible.builtin.uri:
+    url: "{{ policy_url }}"
+    method: PUT
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    body_format: json
+    body:
+      policy:
+        description: "Nginx logs: rollover 1mb or 1m, delete after 10m"
+        schema_version: 1
+        default_state: hot
+        states:
+          - name: hot
+            actions:
+              - rollover:
+                  min_primary_shard_size: "1mb"
+                  min_index_age: "1m"
+                  prevent_empty_rollover: true
+            transitions:
+              - state_name: warm
+
+          - name: warm
+            actions:
+              - allocation:
+                  require:
+                    temp: warm
+            transitions:
+              - state_name: delete
+                conditions:
+                  min_index_age: "10m"
+
+          - name: delete
+            actions:
+              - delete: {}
+            transitions: []
+
+        ism_template:
+          index_patterns:
+            - ".ds-logs-*"
+          priority: 100
+    status_code: [200, 201]
+
+- name: Create nginx logs index template
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_index_template/logs-nginx-template"
+    method: PUT
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    body_format: json
+    body:
+      index_patterns:
+        - "logs"
+      priority: 500
+      data_stream: {}
+      template:
+        settings:
+          number_of_shards: 1
+          number_of_replicas: 0
+          refresh_interval: "1s"
+          index.routing.allocation.require.temp: hot
+        mappings:
+          properties:
+            "@timestamp":
+              type: date
+            remote_addr:
+              type: ip
+            method:
+              type: keyword
+            path:
+              type: keyword
+            status:
+              type: integer
+            bytes_sent:
+              type: long
+            request_time:
+              type: float
+            request:
+              type: text
+            user_agent:
+              type: text
+    status_code: [200]
+
+- name: Check if logs data stream exists
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_data_stream/logs"
+    method: GET
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: [200, 404]
+  register: logs_stream_check
+
+- name: Create logs data stream
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_data_stream/logs"
+    method: PUT
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: [200, 201]
+  when: logs_stream_check.status == 404
+
+- name: Get data stream backing indexes
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_data_stream/logs"
+    method: GET
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: 200
+  register: logs_stream_info
+
+- name: Inspect ISM policy on backing indexes
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_plugins/_ism/explain/{{ item.index_name }}"
+    method: GET
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: 200
+  loop: "{{ logs_stream_info.json.data_streams[0].indices }}"
+  loop_control:
+    label: "{{ item.index_name }}"
+  register: logs_backing_explain
+
+- name: Refuse to replace another ISM policy
+  ansible.builtin.assert:
+    that:
+      - current_policy in ['', 'logs-retention-10m']
+    fail_msg: "Backing index already uses another ISM policy"
+  vars:
+    current_policy: >-
+      {{ item.json.get(item.item.index_name, {}).get('policy_id')
+         | default('', true) }}
+  loop: "{{ logs_backing_explain.results }}"
+  loop_control:
+    label: "{{ item.item.index_name }}"
+
+- name: Attach policy to unmanaged backing indexes
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_plugins/_ism/add/{{ item.item.index_name }}"
+    method: POST
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    body_format: json
+    body:
+      policy_id: logs-retention-10m
+    status_code: 200
+  when: >-
+    not (item.json.get(item.item.index_name, {}).get('policy_id')
+         | default('', true))
+  loop: "{{ logs_backing_explain.results }}"
+  loop_control:
+    label: "{{ item.item.index_name }}"
+
+- name: Set faster ISM checks for the lab
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_cluster/settings"
+    method: PUT
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    body_format: json
+    body:
+      persistent:
+        plugins.index_state_management.job_interval: 1
+        plugins.index_state_management.jitter: 0
+    status_code: 200
+
+- name: Show logs index management result
+  ansible.builtin.debug:
+    msg:
+      data_stream: logs
+      template: logs-nginx-template
+      ism_policy: logs-retention-10m
+      rollover: "1mb OR 1m"
+      retention: "10m"
+      allocation: "hot -> warm"
