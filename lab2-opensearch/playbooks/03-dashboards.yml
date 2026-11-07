@@ -5,6 +5,8 @@
   become: true
   vars:
     populate_inventory_to_hosts_file: false
+  vars_files:
+    - ../vars/opensearch.yml
   pre_tasks:
     - name: Detect existing upstream Dashboards configuration
       ansible.builtin.stat:

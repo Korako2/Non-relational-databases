@@ -3,6 +3,8 @@
   hosts: os-cluster
   gather_facts: true
   become: true
+  vars_files:
+    - ../vars/opensearch.yml
   pre_tasks:
     - name: Detect prior upstream TLS bootstrap
       ansible.builtin.stat:
