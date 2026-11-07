@@ -31,40 +31,7 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     body_format: json
-    body:
-      policy:
-        description: "Nginx logs: rollover 1mb or 1m, delete after 10m"
-        schema_version: 1
-        default_state: hot
-        states:
-          - name: hot
-            actions:
-              - rollover:
-                  min_primary_shard_size: "1mb"
-                  min_index_age: "1m"
-                  prevent_empty_rollover: true
-            transitions:
-              - state_name: warm
-
-          - name: warm
-            actions:
-              - allocation:
-                  require:
-                    temp: warm
-            transitions:
-              - state_name: delete
-                conditions:
-                  min_index_age: "10m"
-
-          - name: delete
-            actions:
-              - delete: {}
-            transitions: []
-
-        ism_template:
-          index_patterns:
-            - ".ds-logs-*"
-          priority: 100
+    body: "{{ lookup('ansible.builtin.file', role_path ~ '/files/ism-policy.yml') | from_yaml }}"
     status_code: [200, 201]
 
 - name: Create nginx logs index template
@@ -76,37 +43,7 @@
     ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
     validate_certs: true
     body_format: json
-    body:
-      index_patterns:
-        - "logs"
-      priority: 500
-      data_stream: {}
-      template:
-        settings:
-          number_of_shards: 1
-          number_of_replicas: 0
-          refresh_interval: "1s"
-          index.routing.allocation.require.temp: hot
-        mappings:
-          properties:
-            "@timestamp":
-              type: date
-            remote_addr:
-              type: ip
-            method:
-              type: keyword
-            path:
-              type: keyword
-            status:
-              type: integer
-            bytes_sent:
-              type: long
-            request_time:
-              type: float
-            request:
-              type: text
-            user_agent:
-              type: text
+    body: "{{ lookup('ansible.builtin.file', role_path ~ '/files/index-template.yml') | from_yaml }}"
     status_code: [200]
 
 - name: Check if logs data stream exists

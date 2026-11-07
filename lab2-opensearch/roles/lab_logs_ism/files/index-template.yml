@@ -1,0 +1,31 @@
+---
+index_patterns:
+  - "logs"
+priority: 500
+data_stream: {}
+template:
+  settings:
+    number_of_shards: 1
+    number_of_replicas: 0
+    refresh_interval: "1s"
+    index.routing.allocation.require.temp: hot
+  mappings:
+    properties:
+      "@timestamp":
+        type: date
+      remote_addr:
+        type: ip
+      method:
+        type: keyword
+      path:
+        type: keyword
+      status:
+        type: integer
+      bytes_sent:
+        type: long
+      request_time:
+        type: float
+      request:
+        type: text
+      user_agent:
+        type: text
