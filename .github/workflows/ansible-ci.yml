@@ -41,8 +41,11 @@ jobs:
       - name: Run ansible-lint
         run: |
           ansible-lint .
-          # Explicit paths also cover versions that fail to expand the root directory.
-          ansible-lint lab1-mongodb/ lab2-opensearch/ requirements.yml
+          # Explicit playbooks and roles also cover versions with limited root discovery.
+          ansible-lint \
+            lab1-mongodb/playbooks/*.yml lab1-mongodb/roles/*/ \
+            lab2-opensearch/playbooks/*.yml lab2-opensearch/roles/*/ \
+            lab2-opensearch/site.yml requirements.yml
 
       - name: Run syntax checks
         run: |
