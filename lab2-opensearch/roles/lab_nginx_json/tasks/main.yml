@@ -19,18 +19,7 @@
     owner: root
     group: root
     mode: "0644"
-    content: |
-      <!DOCTYPE html>
-      <html lang="ru">
-      <head>
-        <meta charset="UTF-8">
-        <title>OpenSearch Lab</title>
-      </head>
-      <body>
-        <h1>OpenSearch Logging Lab</h1>
-        <p>Nginx -> Fluent Bit -> OpenSearch</p>
-      </body>
-      </html>
+    src: index.html
 
 - name: Create Nginx configuration with JSON logging
   ansible.builtin.copy:
@@ -38,33 +27,7 @@
     owner: root
     group: root
     mode: "0644"
-    content: |
-      log_format opensearch_json escape=json
-        '{'
-          '"@timestamp":"$time_iso8601",'
-          '"remote_addr":"$remote_addr",'
-          '"method":"$request_method",'
-          '"path":"$uri",'
-          '"request":"$request",'
-          '"status":$status,'
-          '"bytes_sent":$body_bytes_sent,'
-          '"request_time":$request_time,'
-          '"user_agent":"$http_user_agent"'
-        '}';
-
-      server {
-          listen 127.0.0.1:8080;
-          server_name _;
-
-          root /var/www/opensearch-lab;
-          index index.html;
-
-          access_log /var/log/nginx/opensearch-access.json opensearch_json;
-
-          location / {
-              try_files $uri $uri/ =404;
-          }
-      }
+    src: opensearch-lab.conf
   notify: Restart nginx
 
 - name: Disable default Nginx site
