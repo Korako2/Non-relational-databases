@@ -1,0 +1,72 @@
+---
+- name: Get authentication information for RBAC users
+  ansible.builtin.uri:
+    url: "{{ rbac_api_url }}/_plugins/_security/authinfo"
+    method: GET
+    user: "{{ item.name }}"
+    password: "{{ item.password }}"
+    force_basic_auth: true
+    ca_path: "{{ rbac_cert_dir }}/root-ca.pem"
+    validate_certs: true
+    return_content: true
+    status_code: 200
+  loop: "{{ rbac_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: rbac_auth_results
+  no_log: true
+
+- name: Verify user names and assigned roles
+  ansible.builtin.assert:
+    that:
+      - item.json.user_name == item.item.name
+      - item.item.role in item.json.roles
+    fail_msg: "RBAC user or role verification failed"
+  loop: "{{ rbac_auth_results.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  no_log: true
+
+- name: Verify monitoring user can retrieve cluster and node metrics
+  ansible.builtin.uri:
+    url: "{{ rbac_api_url }}/{{ item }}"
+    method: GET
+    user: monitor_user
+    password: "{{ rbac_monitor_password }}"
+    force_basic_auth: true
+    ca_path: "{{ rbac_cert_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: 200
+  loop:
+    - "_cluster/health?filter_path=status,number_of_nodes"
+    - "_cluster/stats?filter_path=cluster_name,nodes.count"
+    - "_nodes/stats?filter_path=nodes.*.name,nodes.*.jvm.mem.heap_used_percent"
+  no_log: true
+
+- name: Verify writer and reader cannot access cluster statistics
+  ansible.builtin.uri:
+    url: "{{ rbac_api_url }}/_cluster/stats"
+    method: GET
+    user: "{{ item.name }}"
+    password: "{{ item.password }}"
+    force_basic_auth: true
+    ca_path: "{{ rbac_cert_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: 403
+  loop:
+    - name: logs_writer_user
+      password: "{{ rbac_writer_password }}"
+    - name: logs_reader_user
+      password: "{{ rbac_reader_password }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: Show RBAC verification result
+  ansible.builtin.debug:
+    msg:
+      users: "3 users authenticated successfully"
+      roles: "All users have their expected roles"
+      monitoring: "Cluster health, cluster stats and node stats are accessible"
+      restrictions: "Writer and reader cannot access cluster statistics (HTTP 403)"
+      result: "RBAC verification passed"

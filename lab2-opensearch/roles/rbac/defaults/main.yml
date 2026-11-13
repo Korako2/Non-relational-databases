@@ -1,0 +1,16 @@
+---
+rbac_api_url: "https://{{ ip }}:9200"
+rbac_cert_dir: "{{ lab_opensearch_conf_dir }}"
+
+rbac_users:
+  - name: logs_writer_user
+    role: logs_writer
+    password: "{{ rbac_writer_password }}"
+
+  - name: logs_reader_user
+    role: logs_reader
+    password: "{{ rbac_reader_password }}"
+
+  - name: monitor_user
+    role: cluster_monitor
+    password: "{{ rbac_monitor_password }}"

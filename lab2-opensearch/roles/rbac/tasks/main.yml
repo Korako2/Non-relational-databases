@@ -1,0 +1,56 @@
+---
+- name: Check Security REST API availability
+  ansible.builtin.uri:
+    url: "{{ rbac_api_url }}/_plugins/_security/api/roles"
+    method: GET
+    client_cert: "{{ rbac_cert_dir }}/admin.pem"
+    client_key: "{{ rbac_cert_dir }}/admin.key"
+    ca_path: "{{ rbac_cert_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: 200
+
+- name: Create or update roles
+  ansible.builtin.uri:
+    url: "{{ rbac_api_url }}/_plugins/_security/api/roles/{{ item.name }}"
+    method: PUT
+    client_cert: "{{ rbac_cert_dir }}/admin.pem"
+    client_key: "{{ rbac_cert_dir }}/admin.key"
+    ca_path: "{{ rbac_cert_dir }}/root-ca.pem"
+    validate_certs: true
+    body_format: json
+    body:
+      description: "{{ item.description }}"
+      cluster_permissions: "{{ item.cluster_permissions }}"
+      index_permissions: "{{ item.index_permissions }}"
+    status_code: [200, 201]
+  loop: "{{ rbac_roles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create or update OpenSearch users
+  ansible.builtin.uri:
+    url: "{{ rbac_api_url }}/_plugins/_security/api/internalusers/{{ item.name }}"
+    method: PUT
+    client_cert: "{{ rbac_cert_dir }}/admin.pem"
+    client_key: "{{ rbac_cert_dir }}/admin.key"
+    ca_path: "{{ rbac_cert_dir }}/root-ca.pem"
+    validate_certs: true
+    body_format: json
+    body:
+      password: "{{ item.password }}"
+      backend_roles: []
+      opendistro_security_roles:
+        - "{{ item.role }}"
+      description: "Lab RBAC user - {{ item.role }}"
+    status_code: [200, 201]
+  loop: "{{ rbac_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: Show RBAC configuration summary
+  ansible.builtin.debug:
+    msg:
+      roles_created: "{{ rbac_roles | map(attribute='name') | list }}"
+      users_created: "{{ rbac_users | map(attribute='name') | list }}"
+      result: "RBAC configuration applied successfully"

@@ -1,0 +1,14 @@
+---
+- name: Restart changed node sequentially to preserve cluster-manager quorum
+  ansible.builtin.systemd:
+    name: opensearch
+    state: restarted
+  listen: Restart opensearch after configuration changes
+
+- name: Wait for node REST TLS port after changing tier
+  ansible.builtin.wait_for:
+    host: "{{ ip }}"
+    port: 9200
+    delay: 2
+    timeout: 180
+  listen: Restart opensearch after configuration changes

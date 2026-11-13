@@ -1,0 +1,34 @@
+---
+policy:
+  description: "Nginx logs: rollover 1mb or 1m, delete after 10m"
+  schema_version: 1
+  default_state: hot
+  states:
+    - name: hot
+      actions:
+        - rollover:
+            min_primary_shard_size: "1mb"
+            min_index_age: "1m"
+            prevent_empty_rollover: true
+      transitions:
+        - state_name: warm
+
+    - name: warm
+      actions:
+        - allocation:
+            require:
+              temp: warm
+      transitions:
+        - state_name: delete
+          conditions:
+            min_index_age: "10m"
+
+    - name: delete
+      actions:
+        - delete: {}
+      transitions: []
+
+  ism_template:
+    index_patterns:
+      - ".ds-logs-*"
+    priority: 100

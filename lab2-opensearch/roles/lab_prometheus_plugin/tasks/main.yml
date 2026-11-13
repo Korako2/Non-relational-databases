@@ -1,0 +1,55 @@
+---
+- name: Check installed OpenSearch plugins
+  ansible.builtin.command:
+    cmd: /usr/share/opensearch/bin/opensearch-plugin list
+  register: lab_prometheus_plugin_installed_plugins
+  changed_when: false
+
+- name: Download Prometheus Exporter Plugin 3.9.0.0
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/opensearch-project/opensearch-prometheus-exporter/releases/download/3.9.0.0/prometheus-exporter-3.9.0.0.zip
+    dest: /var/tmp/prometheus-exporter-3.9.0.0.zip
+    mode: "0644"
+    timeout: 120
+  when: "'prometheus-exporter' not in lab_prometheus_plugin_installed_plugins.stdout"
+
+- name: Install Prometheus Exporter Plugin
+  ansible.builtin.command:
+    cmd: >-
+      /usr/share/opensearch/bin/opensearch-plugin install --batch
+      file:///var/tmp/prometheus-exporter-3.9.0.0.zip
+  when: "'prometheus-exporter' not in lab_prometheus_plugin_installed_plugins.stdout"
+  changed_when: true
+  notify: Restart OpenSearch for exporter
+
+- name: Configure exporter to collect metrics from all cluster nodes
+  ansible.builtin.blockinfile:
+    path: /usr/share/opensearch/config/opensearch.yml
+    marker: "# {mark} LAB PROMETHEUS EXPORTER"
+    block: |
+      prometheus.nodes.filter: "_all"
+      prometheus.indices: false
+      prometheus.cluster.settings: false
+  notify: Restart OpenSearch for exporter
+
+- name: Apply OpenSearch plugin configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify exporter responds through HTTPS
+  ansible.builtin.uri:
+    url: "https://{{ ip }}:9200/_prometheus/metrics"
+    method: GET
+    client_cert: "{{ lab_opensearch_conf_dir }}/admin.pem"
+    client_key: "{{ lab_opensearch_conf_dir }}/admin.key"
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    validate_certs: true
+    status_code: 200
+    return_content: true
+  register: lab_prometheus_plugin_exporter_response
+
+- name: Assert Prometheus metrics are present
+  ansible.builtin.assert:
+    that:
+      - "'opensearch_' in lab_prometheus_plugin_exporter_response.content"
+    fail_msg: "Prometheus Exporter returned no OpenSearch metrics"

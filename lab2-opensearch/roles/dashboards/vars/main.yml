@@ -1,0 +1,3 @@
+---
+# vars file for opensearch
+dashboards_java: "{{ es_java | default('dashboards_java-1.8.0-openjdk.x86_64') }}"

@@ -1,0 +1,7 @@
+---
+- name: Restart dashboards
+  listen: restart dashboards
+  ansible.builtin.systemd:
+    name: dashboards
+    state: restarted
+    enabled: true

@@ -1,0 +1,6 @@
+---
+- name: Restart Dashboards after TLS or certificate updates
+  ansible.builtin.systemd:
+    name: dashboards
+    state: restarted
+  listen: Restart dashboards after configuration changes

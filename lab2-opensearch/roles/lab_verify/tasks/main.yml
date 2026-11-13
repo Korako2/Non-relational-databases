@@ -1,0 +1,56 @@
+---
+- name: Validate cluster health via HTTPS and upstream lab CA
+  ansible.builtin.uri:
+    url: https://{{ ip }}:9200/_cluster/health
+    user: admin
+    password: "{{ admin_password }}"
+    force_basic_auth: true
+    validate_certs: true
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    return_content: true
+  register: lab_verify_cluster_health
+  no_log: true
+
+- name: Check expected three members and two data nodes
+  ansible.builtin.assert:
+    that:
+      - lab_verify_cluster_health.json.number_of_nodes | int == 3
+      - lab_verify_cluster_health.json.number_of_data_nodes | int == 2
+      - lab_verify_cluster_health.json.status in ['green', 'yellow']
+    fail_msg: OpenSearch did not form the expected 3-node Hot/Warm cluster.
+
+- name: Get node names and their tier attributes
+  ansible.builtin.uri:
+    url: https://{{ ip }}:9200/_nodes?filter_path=nodes.*.name,nodes.*.attributes
+    user: admin
+    password: "{{ admin_password }}"
+    force_basic_auth: true
+    validate_certs: true
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    return_content: true
+  no_log: true
+  register: lab_verify_nodes_result
+
+- name: Require Hot and Warm tags on correct nodes
+  ansible.builtin.assert:
+    that:
+      - (lab_verify_nodes_result.json.nodes.values() | selectattr('name', 'equalto', 'os-hot') | first).attributes.temp == 'hot'
+      - (lab_verify_nodes_result.json.nodes.values() | selectattr('name', 'equalto', 'os-warm') | first).attributes.temp == 'warm'
+
+- name: Check Dashboards responds over verified HTTPS
+  ansible.builtin.uri:
+    url: https://{{ ip }}:5601/
+    follow_redirects: none
+    validate_certs: true
+    ca_path: "{{ lab_opensearch_conf_dir }}/root-ca.pem"
+    status_code: [200, 302, 401, 403]
+  register: lab_verify_dashboards_https_check
+
+- name: Show summary without leaking credentials
+  ansible.builtin.debug:
+    msg:
+      cluster: "{{ lab_verify_cluster_health.json.cluster_name }}"
+      status: "{{ lab_verify_cluster_health.json.status }}"
+      total_nodes: "{{ lab_verify_cluster_health.json.number_of_nodes }}"
+      data_nodes: "{{ lab_verify_cluster_health.json.number_of_data_nodes }}"
+      dashboards_http_status: "{{ lab_verify_dashboards_https_check.status }}"

@@ -1,0 +1,14 @@
+---
+- name: Add Hot/Warm allocation attribute only on data nodes
+  ansible.builtin.lineinfile:
+    path: /usr/share/opensearch/config/opensearch.yml
+    regexp: "^node\\.attr\\.temp:"
+    line: "node.attr.temp: {{ os_tier }}"
+    insertafter: EOF
+    state: "{{ 'present' if os_tier in ['hot', 'warm'] else 'absent' }}"
+    backup: true
+  register: lab_hot_warm_allocation_attribute
+  notify: Restart opensearch after configuration changes
+
+- name: Apply pending opensearch restart
+  ansible.builtin.meta: flush_handlers

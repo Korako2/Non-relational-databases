@@ -1,0 +1,190 @@
+{
+  "uid": "opensearch-lab-monitoring",
+  "title": "OpenSearch Lab Monitoring",
+  "tags": ["opensearch", "lab"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Cluster health",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "max(opensearch_cluster_status)", "refId": "A"}
+      ],
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {"text": "GREEN", "color": "green", "index": 0},
+                "1": {"text": "YELLOW", "color": "yellow", "index": 1},
+                "2": {"text": "RED", "color": "red", "index": 2}
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Cluster nodes",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "max(opensearch_cluster_nodes_number)", "refId": "A"}
+      ],
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Data nodes",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "max(opensearch_cluster_datanodes_number)", "refId": "A"}
+      ],
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Active shards %",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "min(opensearch_cluster_shards_active_percent)", "refId": "A"}
+      ],
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JVM Heap usage by node",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "opensearch_jvm_mem_heap_used_percent",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "CPU usage by node",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "opensearch_os_cpu_percent",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Free disk by node",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "min by (node) (opensearch_fs_total_available_bytes)",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Indexing operations per second",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (node) (rate(opensearch_indices_indexing_index_count[1m]))",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Search operations per second",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (node) (rate(opensearch_indices_search_query_count[1m]))",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 21},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    }
+  ]
+}
