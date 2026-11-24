@@ -3,8 +3,6 @@
   hosts: redis_lab
   become: true
   gather_facts: true
-  vars_files:
-    - group_vars/secrets.yml
   vars:
     project_dir: /opt/redis-rate-limiter-lab
   pre_tasks:
@@ -14,6 +12,11 @@
           - ansible_distribution == 'Ubuntu'
           - ansible_distribution_version in ['22.04', '24.04']
         fail_msg: 'Only Ubuntu 22.04/24.04 hosts are supported.'
+
+    - name: Load lab secrets
+      ansible.builtin.include_vars:
+        file: group_vars/secrets.yml
+      no_log: true
 
     - name: Check lab secrets exist
       ansible.builtin.assert:
@@ -55,13 +58,10 @@
         owner: root
         group: root
         mode: '0644'
-      register: docker_config
+      notify: Restart Docker
 
-    - name: Restart Docker if configuration changed
-      ansible.builtin.systemd_service:
-        name: docker
-        state: restarted
-      when: docker_config.changed
+    - name: Apply Docker configuration before deployment
+      ansible.builtin.meta: flush_handlers
 
     - name: Create project directory
       ansible.builtin.file:
@@ -73,12 +73,14 @@
       ansible.builtin.copy:
         src: ../app/
         dest: "{{ project_dir }}/app/"
+        mode: preserve
         directory_mode: '0755'
 
     - name: Copy monitoring configuration and Grafana dashboard
       ansible.builtin.copy:
         src: ../monitoring/
         dest: "{{ project_dir }}/monitoring/"
+        mode: preserve
         directory_mode: '0755'
 
     - name: Copy Compose stack definition
@@ -113,3 +115,9 @@
       retries: 15
       delay: 2
       until: ready_result.status == 200
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        state: restarted
