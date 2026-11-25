@@ -1,0 +1,1 @@
+"""Educational rate limiter application."""

@@ -1,0 +1,123 @@
+---
+- name: Install Docker and deploy Redis rate limiter lab
+  hosts: redis_lab
+  become: true
+  gather_facts: true
+  vars:
+    project_dir: /opt/redis-rate-limiter-lab
+  pre_tasks:
+    - name: Check supported operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'Ubuntu'
+          - ansible_distribution_version in ['22.04', '24.04']
+        fail_msg: 'Only Ubuntu 22.04/24.04 hosts are supported.'
+
+    - name: Load lab secrets
+      ansible.builtin.include_vars:
+        file: group_vars/secrets.yml
+      no_log: true
+
+    - name: Check lab secrets exist
+      ansible.builtin.assert:
+        that:
+          - redis_password | length >= 16
+          - grafana_admin_password | length >= 16
+          - redis_password != grafana_admin_password
+          - redis_password is match("^[a-zA-Z0-9_-]+$")
+          - grafana_admin_password is match("^[a-zA-Z0-9_-]+$")
+      no_log: false
+
+  tasks:
+    - name: Install Docker Engine and Compose V2
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - docker-buildx
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Enable and start Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        enabled: true
+        state: started
+    - name: Configure Docker registry mirrors
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              "https://dockerhub.timeweb.cloud",
+              "https://dh-mirror.gitverse.ru",
+              "https://cr.yandex/mirror"
+            ]
+          }
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Docker
+
+    - name: Apply Docker configuration before deployment
+      ansible.builtin.meta: flush_handlers
+
+    - name: Create project directory
+      ansible.builtin.file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Copy application sources
+      ansible.builtin.copy:
+        src: ../app/
+        dest: "{{ project_dir }}/app/"
+        mode: preserve
+        directory_mode: '0755'
+
+    - name: Copy monitoring configuration and Grafana dashboard
+      ansible.builtin.copy:
+        src: ../monitoring/
+        dest: "{{ project_dir }}/monitoring/"
+        mode: preserve
+        directory_mode: '0755'
+
+    - name: Copy Compose stack definition
+      ansible.builtin.copy:
+        src: ../compose.yml
+        dest: "{{ project_dir }}/compose.yml"
+        mode: '0644'
+
+    - name: Render private Docker Compose environment
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ project_dir }}/.env"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Build and start containers using Docker Compose V2
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        build: always
+        wait: true
+        wait_timeout: 240
+
+    - name: Verify API and Redis readiness from VM
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8000/health/ready
+        status_code: 200
+        return_content: true
+      register: ready_result
+      retries: 15
+      delay: 2
+      until: ready_result.status == 200
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        state: restarted
