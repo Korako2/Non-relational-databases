@@ -1,0 +1,85 @@
+---
+- name: Deploy ClickHouse analytics lab
+  hosts: lab4
+  become: true
+  vars:
+    lab_dir: /opt/lab4
+    install_docker: true
+  tasks:
+    - name: Install Docker from Ubuntu 24.04 repository
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - curl
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: install_docker | bool
+
+    - name: Start Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create project directory
+      ansible.builtin.file:
+        path: '{{ lab_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Copy application and configuration
+      ansible.builtin.copy:
+        src: '{{ playbook_dir }}/../{{ item }}'
+        dest: '{{ lab_dir }}/'
+        mode: preserve
+      loop:
+        - docker-compose.yml
+        - .env.example
+        - clickhouse
+        - generator
+        - grafana
+        - scripts
+
+    - name: Generate secrets once on the server
+      ansible.builtin.command:
+        cmd: python3 scripts/init_env.py
+        chdir: '{{ lab_dir }}'
+        creates: '{{ lab_dir }}/.env'
+
+    - name: Validate Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose config --quiet
+        chdir: '{{ lab_dir }}'
+      changed_when: false
+
+    - name: Start lab containers
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: '{{ lab_dir }}'
+      register: compose_up
+      changed_when: true
+
+    - name: Wait for Grafana HTTP API
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/health
+        status_code: 200
+      register: grafana_health
+      retries: 60
+      delay: 5
+      until: grafana_health.status | default(0) == 200
+
+    - name: Check data path and Grafana provisioning
+      ansible.builtin.command:
+        cmd: bash scripts/check.sh
+        chdir: '{{ lab_dir }}'
+      register: lab_check
+      retries: 12
+      delay: 5
+      until: lab_check.rc == 0
+      changed_when: false
+
+    - name: Show verification results
+      ansible.builtin.debug:
+        var: lab_check.stdout_lines
