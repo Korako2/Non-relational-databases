@@ -21,5 +21,18 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  init:
+    image: ${CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:25.8}
+    entrypoint: [ /bin/bash, /setup/init.sh ]
+    environment:
+      CH_ADMIN_PASSWORD: ${CH_ADMIN_PASSWORD:?required}
+      CH_WRITER_PASSWORD: ${CH_WRITER_PASSWORD:?required}
+      CH_READER_PASSWORD: ${CH_READER_PASSWORD:?required}
+    volumes:
+      - ./clickhouse:/setup:ro
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: 'no'
 volumes:
   clickhouse_data:
