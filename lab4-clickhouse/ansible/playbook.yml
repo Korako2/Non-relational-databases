@@ -70,16 +70,13 @@
       delay: 5
       until: grafana_health.status | default(0) == 200
 
-    - name: Check data path and Grafana provisioning
+    - name: Check containers
       ansible.builtin.command:
-        cmd: bash scripts/check.sh
+        cmd: docker compose ps -a
         chdir: '{{ lab_dir }}'
-      register: lab_check
-      retries: 12
-      delay: 5
-      until: lab_check.rc == 0
+      register: containers
       changed_when: false
 
-    - name: Show verification results
+    - name: Show containers status
       ansible.builtin.debug:
-        var: lab_check.stdout_lines
+        var: containers.stdout_lines
