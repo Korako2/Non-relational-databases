@@ -36,7 +36,7 @@
         mode: preserve
       loop:
         - docker-compose.yml
-        - .env.example
+        - .env
         - clickhouse
         - generator
         - grafana
