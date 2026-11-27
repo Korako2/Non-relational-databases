@@ -34,5 +34,42 @@ services:
       clickhouse:
         condition: service_healthy
     restart: 'no'
+
+  generator:
+    image: ${PYTHON_IMAGE:-python:3.12-slim}
+    command: [ python, -u, /app/generator.py ]
+    environment:
+      CH_URL: http://clickhouse:8123
+      CH_USER: lab_writer
+      CH_PASSWORD: ${CH_WRITER_PASSWORD:?required}
+      BATCH_SIZE: ${BATCH_SIZE:-500}
+      BATCH_INTERVAL: ${BATCH_INTERVAL:-5}
+    volumes:
+      - ./generator:/app:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:12.1.1}
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?required}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-clickhouse-datasource@4.15.0
+      CH_READER_PASSWORD: ${CH_READER_PASSWORD:?required}
+    ports:
+      - '${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   clickhouse_data:
+  grafana_data:
