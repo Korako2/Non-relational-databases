@@ -3,7 +3,7 @@ from secrets import token_hex
 import os
 
 path = Path(__file__).resolve().parents[1] / '.env'
-example = path.with_name('.env').read_text()
+example = path.with_name('.env.example').read_text()
 try:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 except FileExistsError:

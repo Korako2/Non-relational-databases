@@ -6,22 +6,40 @@
     lab_dir: /opt/lab4
     install_docker: true
   tasks:
-    - name: Install Docker from Ubuntu 24.04 repository
+    - name: Install Docker Engine and Compose V2
       ansible.builtin.apt:
         name:
           - docker.io
           - docker-compose-v2
-          - curl
+          - docker-buildx
         state: present
         update_cache: true
         cache_valid_time: 3600
-      when: install_docker | bool
 
-    - name: Start Docker
-      ansible.builtin.service:
+    - name: Enable and start Docker
+      ansible.builtin.systemd_service:
         name: docker
-        state: started
         enabled: true
+        state: started
+
+    - name: Configure Docker registry mirrors
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              "https://dockerhub.timeweb.cloud",
+              "https://dh-mirror.gitverse.ru",
+              "https://cr.yandex/mirror"
+            ]
+          }
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Docker
+
+    - name: Apply Docker configuration before deployment
+      ansible.builtin.meta: flush_handlers
 
     - name: Create project directory
       ansible.builtin.file:
@@ -36,7 +54,7 @@
         mode: preserve
       loop:
         - docker-compose.yml
-        - .env
+        - .env.example
         - clickhouse
         - generator
         - grafana
@@ -80,3 +98,9 @@
     - name: Show containers status
       ansible.builtin.debug:
         var: containers.stdout_lines
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        state: restarted
