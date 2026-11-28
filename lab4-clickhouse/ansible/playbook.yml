@@ -1,0 +1,106 @@
+---
+- name: Deploy ClickHouse analytics lab
+  hosts: lab4
+  become: true
+  vars:
+    lab_dir: /opt/lab4
+    install_docker: true
+  tasks:
+    - name: Install Docker Engine and Compose V2
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - docker-buildx
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Enable and start Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Configure Docker registry mirrors
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "registry-mirrors": [
+              "https://dockerhub.timeweb.cloud",
+              "https://dh-mirror.gitverse.ru",
+              "https://cr.yandex/mirror"
+            ]
+          }
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Docker
+
+    - name: Apply Docker configuration before deployment
+      ansible.builtin.meta: flush_handlers
+
+    - name: Create project directory
+      ansible.builtin.file:
+        path: '{{ lab_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Copy application and configuration
+      ansible.builtin.copy:
+        src: '{{ playbook_dir }}/../{{ item }}'
+        dest: '{{ lab_dir }}/'
+        mode: preserve
+      loop:
+        - docker-compose.yml
+        - .env.example
+        - clickhouse
+        - generator
+        - grafana
+        - scripts
+
+    - name: Generate secrets once on the server
+      ansible.builtin.command:
+        cmd: python3 scripts/init_env.py
+        chdir: '{{ lab_dir }}'
+        creates: '{{ lab_dir }}/.env'
+
+    - name: Validate Compose configuration
+      ansible.builtin.command:
+        cmd: docker compose config --quiet
+        chdir: '{{ lab_dir }}'
+      changed_when: false
+
+    - name: Start lab containers
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: '{{ lab_dir }}'
+      register: compose_up
+      changed_when: true
+
+    - name: Wait for Grafana HTTP API
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3000/api/health
+        status_code: 200
+      register: grafana_health
+      retries: 60
+      delay: 5
+      until: grafana_health.status | default(0) == 200
+
+    - name: Check containers
+      ansible.builtin.command:
+        cmd: docker compose ps -a
+        chdir: '{{ lab_dir }}'
+      register: containers
+      changed_when: false
+
+    - name: Show containers status
+      ansible.builtin.debug:
+        var: containers.stdout_lines
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        state: restarted

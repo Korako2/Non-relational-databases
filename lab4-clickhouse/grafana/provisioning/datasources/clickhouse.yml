@@ -1,0 +1,19 @@
+apiVersion: 1
+datasources:
+  - name: ClickHouse
+    uid: clickhouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      host: clickhouse
+      port: 9000
+      protocol: native
+      secure: false
+      username: lab_grafana
+      defaultDatabase: lab4
+      dialTimeout: '10'
+      queryTimeout: '30'
+    secureJsonData:
+      password: $CH_READER_PASSWORD
